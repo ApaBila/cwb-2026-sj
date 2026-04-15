@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .services.spec_catcher import catch_spec
 import json
 from .schemas import ProjectUpdate
+from openai import APIStatusError
 
 app = FastAPI(title="SJ Project Planner API")
 app.add_middleware(
@@ -23,7 +24,8 @@ async def project_update(payload: dict = Body(...)):
     text = payload.get("text", "")
 
     if not text:
-        return {"error": "Please provide text updates."}
+        raise HTTPException(
+            status_code=400, detail="Missing 'text' in request body.")
 
     try:
         ai_response = catch_spec(text)
@@ -39,6 +41,11 @@ async def project_update(payload: dict = Body(...)):
             raise HTTPException(
                 status_code=500, detail=f"Error validating the response: {str(e)}")
         return validated_response.model_dump(mode='json')
+    except APIStatusError as e:
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=e.message
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error processing the request: {str(e)}")

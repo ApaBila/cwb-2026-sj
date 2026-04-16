@@ -5,7 +5,7 @@ import json
 from .schemas import ProjectUpdate
 from openai import APIStatusError
 from .database import SessionLocal
-from .services.change_detector import detect_change
+from .services.change_detector import detect_changes_batched
 
 app = FastAPI(title="SJ Project Planner API")
 app.add_middleware(
@@ -44,9 +44,8 @@ async def project_update(payload: dict = Body(...)):
                 status_code=500, detail=f"Error validating the response: {str(e)}")
 
         # Check action types for all tasks and detect changes
-        for task_update in validated_response.tasks:
-            with SessionLocal() as db:
-                detect_change(db, task_update)
+        with SessionLocal() as db:
+            detect_changes_batched(db, validated_response.tasks)
 
         return validated_response.model_dump(mode='json')
     except APIStatusError as e:

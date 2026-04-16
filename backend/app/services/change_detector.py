@@ -19,7 +19,7 @@ def detect_changes_batched(db: Session, task_updates: list[TaskUpdate]):
         print("Detecting changes for task:", task_update.task)
         print("Action type from AI:", task_update.action_type)
 
-        existing_task = existing_task_map.get(task_update.task)
+        existing_task = existing_task_map.get(task_update.task)  # type: ignore
 
         if existing_task:
             if task_update.action_type in ["new_task", "conflict_needs_clarification"]:
@@ -38,8 +38,8 @@ def detect_changes_batched(db: Session, task_updates: list[TaskUpdate]):
             **task_update.model_dump(exclude_none=True)
         )
 
-        update_draft.action_type = final_action
-        update_draft.is_approved = False
+        update_draft.action_type = final_action  # type: ignore
+        update_draft.is_approved = False  # type: ignore
 
         update_drafts.append(update_draft)
 

@@ -24,3 +24,7 @@ class ProjectUpdate(BaseModel):
     source_date_iso: Optional[date] = None
     project_timezone: Optional[str] = "Unspecified"
     tasks: List[TaskUpdate]
+
+
+class UpdateRequest(BaseModel):
+    user_text: str = Field()

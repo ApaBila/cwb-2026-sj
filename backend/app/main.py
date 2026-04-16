@@ -2,10 +2,11 @@ from fastapi import FastAPI, Body, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from .services.spec_catcher import catch_spec
 import json
-from .schemas import ProjectUpdate
+from .schemas import ProjectUpdate, UpdateRequest
 from openai import APIStatusError
 from .database import SessionLocal
 from .services.change_detector import detect_changes_batched
+from sqlalchemy import text
 
 app = FastAPI(title="SJ Project Planner API")
 app.add_middleware(
@@ -18,19 +19,22 @@ app.add_middleware(
 
 @app.get("/")
 def health_check():
+    """Checks if we can connect to the database"""
+    with SessionLocal() as db:
+        try:
+            db.execute(text("SELECT 1"))  # type: ignore
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, detail=f"Database connection failed: {str(e)}")
     return {"status": "online", "message": "SJ Planner Backend is running"}
 
 
 @app.post("/api/project-update")
-async def project_update(payload: dict = Body(...)):
-    text = payload.get("text", "")
-
-    if not text:
-        raise HTTPException(
-            status_code=400, detail="Missing 'text' in request body.")
+async def project_update(request_text: UpdateRequest):
+    user_text = request_text.user_text
 
     try:
-        ai_response = catch_spec(text)
+        ai_response = catch_spec(user_text)
 
         try:
             raw_response = json.loads(ai_response)  # type: ignore
@@ -39,20 +43,16 @@ async def project_update(payload: dict = Body(...)):
                 status_code=500, detail="AI did not return valid JSON.")
         try:
             validated_response = ProjectUpdate(**raw_response)
-        except Exception as e:
+        except APIStatusError as e:
             raise HTTPException(
-                status_code=500, detail=f"Error validating the response: {str(e)}")
-
+                status_code=e.status_code,
+                detail=e.message
+            )
         # Check action types for all tasks and detect changes
         with SessionLocal() as db:
             detect_changes_batched(db, validated_response.tasks)
 
         return validated_response.model_dump(mode='json')
-    except APIStatusError as e:
-        raise HTTPException(
-            status_code=e.status_code,
-            detail=e.message
-        )
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error processing the request: {str(e)}")

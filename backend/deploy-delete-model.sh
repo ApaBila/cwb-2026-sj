@@ -21,7 +21,7 @@ deploy_model() {
                                                --deployment-name "$DEPLOYMENT_NAME" \
     
     if [ $? -eq 0 ]; then
-        echo "Deployed and ready for testing."
+        echo "Deployment started."
     else
         echo "Failed to deploy model."
     fi

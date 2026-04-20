@@ -27,7 +27,38 @@ client = AzureOpenAI(
 )
 
 
-def catch_spec(text: str):
+def catch_spec(text: str, no_ai: bool = False):
+    if no_ai:
+        return """{
+            "source_date_iso": null,
+            "project_timezone": "Unspecified",
+            "tasks": [
+                {
+                    "task": "Unspecified",
+                    "owner": "Unassigned",
+                    "due_date_raw": "Unspecified",
+                    "due_date_iso": null,
+                    "status": "Unknown",
+                    "dependency": null,
+                    "source": null,
+                    "confidence": "Low",
+                    "action_type": "conflict_needs_clarification"
+                },
+                {
+                    "task": "Unspecified",
+                    "owner": "Unassigned",
+                    "due_date_raw": "Unspecified",
+                    "due_date_iso": null,
+                    "status": "Unknown",
+                    "dependency": null,
+                    "source": null,
+                    "confidence": "Low",
+                    "action_type": "conflict_needs_clarification"
+                }
+            ]
+        }
+        """
+
     response = client.chat.completions.create(
         messages=[
             {

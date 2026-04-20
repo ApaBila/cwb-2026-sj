@@ -30,10 +30,12 @@ client = AzureOpenAI(
 def catch_spec(text: str, no_ai: bool = False):
     if no_ai:
         return """{
-            "source_date_iso": null,
-            "project_timezone": "Unspecified",
-            "tasks": [
+        "tasks":
+            [
                 {
+                    "project": "Unspecified",
+                    "source_date_iso": null,
+                    "project_timezone": "Unspecified",
                     "task": "Unspecified",
                     "owner": "Unassigned",
                     "due_date_raw": "Unspecified",
@@ -45,6 +47,9 @@ def catch_spec(text: str, no_ai: bool = False):
                     "action_type": "conflict_needs_clarification"
                 },
                 {
+                    "project": "Unspecified",
+                    "source_date_iso": null,
+                    "project_timezone": "Unspecified",
                     "task": "Unspecified",
                     "owner": "Unassigned",
                     "due_date_raw": "Unspecified",

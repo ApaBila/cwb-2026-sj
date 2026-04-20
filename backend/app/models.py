@@ -5,6 +5,10 @@ from .database import Base
 class Task(Base):
     __tablename__ = "tasks"
 
+    project = Column(String, default="Unspecified")
+    source_date_iso = Column(Date, nullable=True)
+    project_timezone = Column(String, default="Unspecified")
+
     id = Column(Integer, primary_key=True, index=True)
 
     task = Column(String, nullable=False, default="Unspecified")

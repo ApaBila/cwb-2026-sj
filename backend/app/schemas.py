@@ -4,6 +4,10 @@ from datetime import date
 
 
 class TaskUpdate(BaseModel):
+    project: Optional[str] = "Unspecified"
+    source_date_iso: Optional[date] = None
+    project_timezone: Optional[str] = "Unspecified"
+
     task: Optional[str] = "Unspecified"
     owner: Optional[str] = "Unassigned"
     due_date_raw: Optional[str] = "Unspecified"
@@ -20,9 +24,7 @@ class TaskUpdate(BaseModel):
     action_type: Literal["new_task", "update", "conflict_needs_clarification"]
 
 
-class ProjectUpdate(BaseModel):
-    source_date_iso: Optional[date] = None
-    project_timezone: Optional[str] = "Unspecified"
+class TaskUpdateList(BaseModel):
     tasks: List[TaskUpdate]
 
 

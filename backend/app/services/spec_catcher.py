@@ -37,8 +37,8 @@ def catch_spec(text: str, no_ai: bool = False):
                     "source_date_iso": null,
                     "project_timezone": "Unspecified",
                     "task": "Unspecified",
-                    "owner": "Unassigned",
-                    "due_date_raw": "Unspecified",
+                    "owner": null,
+                    "due_date_raw": null,
                     "due_date_iso": null,
                     "status": "Unknown",
                     "dependency": null,
@@ -51,8 +51,8 @@ def catch_spec(text: str, no_ai: bool = False):
                     "source_date_iso": null,
                     "project_timezone": "Unspecified",
                     "task": "Unspecified",
-                    "owner": "Unassigned",
-                    "due_date_raw": "Unspecified",
+                    "owner": null,
+                    "due_date_raw": null,
                     "due_date_iso": null,
                     "status": "Unknown",
                     "dependency": null,
@@ -68,7 +68,7 @@ def catch_spec(text: str, no_ai: bool = False):
         messages=[
             {
                 "role": "system",
-                "content": "You are the SJ Project Planner Agent. Analyze unstructured meeting notes, emails, and conversations, then extract project updates into a structured response. Output STRICT JSON only as an object with keys: source_date_iso, project_timezone, tasks. source_date_iso must be in YYYY-MM-DD and anchored to the source text date or null. project_timezone must be an IANA timezone string or the string Unspecified. tasks must be an array of task objects using snake_case keys only: task, owner, due_date_raw, due_date_iso, status, dependency, source, confidence, action_type. Do not use spaces in key names. Use null for unknown dependency and unknown source, Unassigned for unknown owner, and Unspecified for unknown task and unkown due_date_raw. due_date_raw preserves the original phrasing from source text. due_date_iso must be YYYY-MM-DD when confidently resolvable from source_date_iso, else null. Allowed status values: Not Started, In Progress, Blocked, Delayed, Done, Paused, At Risk, Unknown. Keep values concise and deterministic for downstream programmatic updates (for example, plan/Gantt updates). confidence should reflect extraction and date-normalization certainty (High, Medium, Low). action_type should align with confidence. Allowed action_type values: new_task, update, conflict_needs_clarification.",
+                "content": """You are the SJ Project Task Updater Agent. Analyze unstructured meeting notes, emails, and conversations, then extract task updates into a structured response. Output STRICT JSON only as an object with the key tasks. tasks must be an array of task objects using snake_case keys only: project, task, owner, project_timezone, source_date_iso, due_date_iso, due_date_raw, status, dependency, source, confidence, action_type. Do not use spaces in key names. Use Unspecified for unknown project and unknown task. project_timezone must be an IANA timezone string or the string Unspecified. Use null for unknown owner, unknown due_date_raw (example: "next Tuesday"), unknown dependency, and unknown source. source_date_iso must be in YYYY-MM-DD and anchored to the source text date or null. due_date_iso must also be YYYY-MM-DD when confidently resolvable from source_date_iso, else null. Allowed status values: Not Started, In Progress, Blocked, Delayed, Done, Paused, At Risk, Unknown. confidence should reflect overall extraction and date-normalization certainty (High, Medium, Low). action_type should align with confidence. Allowed action_type values: new_task, update, conflict_needs_clarification. Keep values concise and deterministic for downstream programmatic updates (example for project value following adjective noun place format: Green City Bogor, min 1 word max 3 words).""",
             },
             {
                 "role": "user",

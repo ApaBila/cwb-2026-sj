@@ -4,13 +4,13 @@ from datetime import date
 
 
 class TaskUpdate(BaseModel):
-    project: Optional[str] = "Unspecified"
+    project: str = "Unspecified"
     source_date_iso: Optional[date] = None
-    project_timezone: Optional[str] = "Unspecified"
+    project_timezone: str = "Unspecified"
 
-    task: Optional[str] = "Unspecified"
-    owner: Optional[str] = "Unassigned"
-    due_date_raw: Optional[str] = "Unspecified"
+    task: str = "Unspecified"
+    owner: Optional[str] = None
+    due_date_raw: Optional[str] = None
     due_date_iso: Optional[date] = None
 
     status: Literal["Not Started", "In Progress", "Blocked",
@@ -31,4 +31,4 @@ class TaskUpdateList(BaseModel):
 class UpdateRequest(BaseModel):
     user_text: str = Field()
     no_ai: bool = Field(
-        default=False, description="Set True for dev mode, no Ai to save Azure credits")
+        default=False, description="Set True for dev mode, no AI to save Azure credits")

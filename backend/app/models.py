@@ -12,8 +12,8 @@ class Task(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     task = Column(String, nullable=False, default="Unspecified")
-    owner = Column(String, default="Unassigned")
-    due_date_raw = Column(String, default="Unspecified")
+    owner = Column(String, nullable=True, default=None)
+    due_date_raw = Column(String, nullable=True, default=None)
     due_date_iso = Column(Date, nullable=True)
 
     status = Column(String, nullable=False, default="Not Started")

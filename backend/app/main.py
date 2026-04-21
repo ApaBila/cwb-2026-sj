@@ -18,7 +18,7 @@ app.add_middleware(
 
 
 @app.get("/")
-def health_check():
+def health_status():
     """Checks if we can connect to the database"""
     with SessionLocal() as db:
         try:
@@ -56,3 +56,17 @@ async def project_update(request_text: UpdateRequest):
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error processing the request: {str(e)}")
+
+
+@app.get("/api/drafts")
+async def get_drafts():
+    with SessionLocal() as db:
+        results = db.execute(
+            text("SELECT * FROM tasks WHERE is_approved = false")).mappings()
+        drafts = {result["id"]: dict(result) for result in results}
+    return drafts
+
+
+@app.put("/api/commit")
+async def commit_updates():
+    pass

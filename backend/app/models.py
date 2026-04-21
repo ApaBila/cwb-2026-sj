@@ -5,11 +5,15 @@ from .database import Base
 class Task(Base):
     __tablename__ = "tasks"
 
+    project = Column(String, default="Unspecified")
+    source_date_iso = Column(Date, nullable=True)
+    project_timezone = Column(String, default="Unspecified")
+
     id = Column(Integer, primary_key=True, index=True)
 
     task = Column(String, nullable=False, default="Unspecified")
-    owner = Column(String, default="Unassigned")
-    due_date_raw = Column(String, default="Unspecified")
+    owner = Column(String, nullable=True, default=None)
+    due_date_raw = Column(String, nullable=True, default=None)
     due_date_iso = Column(Date, nullable=True)
 
     status = Column(String, nullable=False, default="Not Started")

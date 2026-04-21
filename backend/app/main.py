@@ -2,7 +2,7 @@ from fastapi import FastAPI, Body, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from .services.spec_catcher import catch_spec
 import json
-from .schemas import ProjectUpdate, UpdateRequest
+from .schemas import TaskUpdateList, UpdateRequest
 from openai import APIStatusError
 from .database import SessionLocal
 from .services.change_detector import detect_changes_batched
@@ -34,7 +34,7 @@ async def project_update(request_text: UpdateRequest):
     user_text = request_text.user_text
 
     try:
-        ai_response = catch_spec(user_text)
+        ai_response = catch_spec(user_text, no_ai=request_text.no_ai)
 
         try:
             raw_response = json.loads(ai_response)  # type: ignore
@@ -42,7 +42,7 @@ async def project_update(request_text: UpdateRequest):
             raise HTTPException(
                 status_code=500, detail="AI did not return valid JSON.")
         try:
-            validated_response = ProjectUpdate(**raw_response)
+            validated_response = TaskUpdateList(**raw_response)
         except APIStatusError as e:
             raise HTTPException(
                 status_code=e.status_code,

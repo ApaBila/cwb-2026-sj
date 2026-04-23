@@ -35,4 +35,4 @@ class UpdateRequest(BaseModel):
 
 
 class CommitUpdate(BaseModel):
-    task_ids: List[int] = Field()
+    task_ids: List[int] = Field(min_length=1)

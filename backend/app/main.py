@@ -76,7 +76,7 @@ async def commit_updates(request_text: CommitUpdate):
         try:
             tasks_to_commit = db.query(Task).filter(Task.id.in_(task_ids))
 
-            if not tasks_to_commit:
+            if not tasks_to_commit.all():
                 raise HTTPException(
                     status_code=404, detail="No tasks found for those IDs. Try refreshing.")
 

@@ -7,6 +7,8 @@ from openai import APIStatusError
 from .database import SessionLocal
 from .services.change_detector import detect_changes_batched
 from sqlalchemy import text
+from .schemas import CommitUpdate
+from .models import Task
 
 app = FastAPI(title="SJ Project Planner API")
 app.add_middleware(
@@ -68,5 +70,23 @@ async def get_drafts():
 
 
 @app.put("/api/commit")
-async def commit_updates():
-    pass
+async def commit_updates(request_text: CommitUpdate):
+    task_ids = request_text.task_ids
+    with SessionLocal() as db:
+        try:
+            tasks_to_commit = db.query(Task).filter(Task.id.in_(task_ids))
+
+            if not tasks_to_commit:
+                raise HTTPException(
+                    status_code=404, detail="No tasks found for those IDs. Try refreshing.")
+
+            for task in tasks_to_commit:
+                task.is_approved = True  # type: ignore
+
+            db.commit()
+
+            return {"status": "success", "message": f"Committed {len(task_ids)} tasks."}
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=500, detail=f"Error committing tasks: {str(e)}")

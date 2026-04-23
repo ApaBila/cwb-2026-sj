@@ -74,9 +74,10 @@ async def commit_updates(request_text: CommitUpdate):
     task_ids = request_text.task_ids
     with SessionLocal() as db:
         try:
-            tasks_to_commit = db.query(Task).filter(Task.id.in_(task_ids))
+            tasks_to_commit = db.query(Task).filter(
+                Task.id.in_(task_ids)).all()
 
-            if not tasks_to_commit.all():
+            if not tasks_to_commit:
                 raise HTTPException(
                     status_code=404, detail="No tasks found for those IDs. Try refreshing.")
 
@@ -85,7 +86,9 @@ async def commit_updates(request_text: CommitUpdate):
 
             db.commit()
 
-            return {"status": "success", "message": f"Committed {len(task_ids)} tasks."}
+            return {"status": "success", "message": f"Committed {len(tasks_to_commit)} tasks."}
+        except HTTPException:
+            raise
         except Exception as e:
             db.rollback()
             raise HTTPException(

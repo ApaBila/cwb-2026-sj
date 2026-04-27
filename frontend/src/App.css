@@ -74,3 +74,29 @@
   outline: 2px solid var(--sjred);
   outline-offset: 2px;
 }
+
+.blue-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.submit-error {
+  margin: 0;
+  color: var(--sjred);
+  font-family: var(--sans);
+  font-size: 14px;
+}
+
+.submit-result {
+  margin: 0;
+  border: 1px solid var(--sjblue);
+  border-radius: 16px;
+  padding: 16px;
+  max-height: 360px;
+  overflow: auto;
+  background: var(--bg);
+  color: var(--text-h);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.4;
+}

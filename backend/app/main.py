@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Body, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from .services.spec_catcher import catch_spec
+from .services.update_formatter import format_update
 import json
 from .schemas import TaskUpdateList, UpdateRequest
 from openai import APIStatusError
@@ -36,7 +36,7 @@ async def project_update(request_text: UpdateRequest):
     user_text = request_text.user_text
 
     try:
-        ai_response = catch_spec(user_text, no_ai=request_text.no_ai)
+        ai_response = await format_update(user_text, no_ai=request_text.no_ai)
 
         try:
             raw_response = json.loads(ai_response)  # type: ignore

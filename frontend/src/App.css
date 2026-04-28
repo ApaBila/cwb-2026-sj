@@ -36,14 +36,14 @@
   box-sizing: border-box;
   font-family: var(--sans);
   font-size: 18px;
-  color: var(--text-h);
+  color: var(--text);
   background: var(--bg);
   resize: none;
   outline: none;
 }
 
 .message-input::placeholder {
-  color: var(--text-h);
+  color: var(--text);
   opacity: 0.5;
 }
 
@@ -54,6 +54,7 @@
 }
 
 .blue-button {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 0;
@@ -70,7 +71,6 @@
 .blue-button:hover {
   background: var(--bg);
   color: var(--sjred);
-  border-color: var(--sjred);
   outline: 2px solid var(--sjred);
   outline-offset: 2px;
 }
@@ -95,7 +95,7 @@
   max-height: 360px;
   overflow: auto;
   background: var(--bg);
-  color: var(--text-h);
+  color: var(--text);
   font-family: var(--mono);
   font-size: 12px;
   line-height: 1.4;
@@ -120,7 +120,7 @@
   margin: 0;
   font-size: 16px;
   font-weight: 700;
-  color: var(--text-h);
+  color: var(--text);
 }
 
 .select-all-label {
@@ -129,7 +129,7 @@
   gap: 6px;
   cursor: pointer;
   font-size: 13px;
-  color: var(--text-h);
+  color: var(--text);
 }
 
 .select-all-checkbox {
@@ -140,7 +140,7 @@
 
 .no-drafts {
   margin: 0;
-  color: var(--text-h);
+  color: var(--text);
   opacity: 0.6;
   font-family: var(--sans);
   font-size: 14px;
@@ -194,7 +194,7 @@
   width: 100%;
   font-family: var(--sans);
   font-size: 13px;
-  color: var(--text-h);
+  color: var(--text);
 }
 
 .draft-header {
@@ -264,13 +264,13 @@
 
 .detail-label {
   font-weight: 600;
-  color: var(--text-h);
+  color: var(--text);
   opacity: 0.7;
   flex-shrink: 0;
 }
 
 .detail-value {
-  color: var(--text-h);
+  color: var(--text);
   flex: 1;
   word-break: break-word;
 }

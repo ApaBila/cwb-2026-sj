@@ -140,7 +140,7 @@ function App() {
       <section className="panel-layout" aria-label="Approval workspace">
         
         <div className="panel panel-left">
-          <input
+          <textarea
             id="message-input"
             className="message-input"
             type="text"

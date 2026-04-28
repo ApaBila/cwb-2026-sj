@@ -1,0 +1,3 @@
+[submodule "CWB_SJ"]
+	path = CWB_SJ
+	url = git@github.com:DoreenSteven/CWB_SJ.git

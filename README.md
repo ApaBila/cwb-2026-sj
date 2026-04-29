@@ -41,9 +41,17 @@ cd backend
 fastapi dev
 ```
 
-## Run the frontend
+### Run the frontend
 In a **separate** terminal:
 ```bash
 cd frontend
 npm run dev
 ```
+
+## Contributor Acknowledgement
+*   backend: I developed the backend's AI API and set up all Azure resources.
+    Copilot/Gemini assisted with sqlalchemy for managing the database and led creation of the seed/finetune data before the official data was released.
+*   frontend: I initially generated the frontend by template, then prompted Copilot/Gemini for a basic prototype to test wiring to the backend (then edited the code), TODO: then used open source projects for a more polished look.
+*   Copilot also helped with GitHub code reviews.
+
+I tried to ensure the commit messages reflected this AI use but eventually removed Copilot (April 29) from being listed as a co-author for code autocompletion which I mostly used to quickly repeat previous code patterns. chatAndAgent use continues to credit Copilot as a co-author.

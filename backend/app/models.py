@@ -1,7 +1,5 @@
 from sqlalchemy import Column, Integer, String, Date, Boolean
 from .database import Base
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import CheckConstraint
 
 
 class Task(Base):

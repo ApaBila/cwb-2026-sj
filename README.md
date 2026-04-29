@@ -9,6 +9,7 @@ This project uses AI to make unstructured notes, emails, etc. into structured JS
 ```bash
 git clone git@github.com:ApaBila/cwb-2026-sj.git
 cd cwb-2026-sj
+git submodule update --init --recursive
 ```
 
 ### Install backend dependencies

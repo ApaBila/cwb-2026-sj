@@ -7,6 +7,23 @@ from app.models import Dependency, Person, Project, Task
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "CWB_SJ"
 
+REQUIRED_CSV_FILES = ["people.csv", "projects.csv", "dependencies.csv", "tasks_master.csv"]
+
+if not DATA_DIR.is_dir():
+    raise RuntimeError(
+        f"Dataset directory not found: {DATA_DIR}\n"
+        "The CWB_SJ submodule has not been initialised. Run:\n"
+        "    git submodule update --init --recursive"
+    )
+
+missing_files = [f for f in REQUIRED_CSV_FILES if not (DATA_DIR / f).is_file()]
+if missing_files:
+    raise RuntimeError(
+        f"Missing expected CSV file(s) in {DATA_DIR}: {', '.join(missing_files)}\n"
+        "Ensure the submodule is fully populated by running:\n"
+        "    git submodule update --init --recursive"
+    )
+
 
 def read_csv_rows(filename: str) -> list[dict[str, str]]:
     with (DATA_DIR / filename).open(newline="", encoding="utf-8") as csv_file:

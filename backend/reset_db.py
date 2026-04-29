@@ -13,5 +13,9 @@ if env_path.exists():
 engine = create_engine(os.environ.get("DATABASE_URL"))
 
 with engine.begin() as connection:
-    connection.execute(text("TRUNCATE TABLE tasks RESTART IDENTITY;"))
-    print("Success: The 'tasks' table has been wiped clean and IDs reset to 1.")
+    connection.execute(
+        text("TRUNCATE TABLE dependencies, tasks, people, projects RESTART IDENTITY;")
+    )
+    print(
+        "Success: The dependencies, tasks, people, and projects tables have been wiped clean."
+    )

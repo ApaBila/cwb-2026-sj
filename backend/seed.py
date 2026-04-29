@@ -1,65 +1,150 @@
+import csv
 from datetime import date
+from pathlib import Path
+
 from app.database import SessionLocal
-from app.models import Task
+from app.models import Dependency, Person, Project, Task
 
-baseline_tasks = [
-    # Phase 1: Pre-Construction & Approvals
-    Task(project="Unspecified", source_date_iso=None, project_timezone="Unspecified", task="Environmental Impact Assessment", owner="Dr. Maria", due_date_raw="March 1, 2026", due_date_iso=date(2026, 3, 1),
-         status="Done", dependency=None, source="Project Charter", confidence="High", action_type="new_task", is_approved=True),
-    Task(project="Unspecified", source_date_iso=None, project_timezone="Unspecified", task="Zoning Board Approval", owner="Doreen", due_date_raw="March 15, 2026", due_date_iso=date(2026, 3, 15), status="Done",
-         dependency="Environmental Impact Assessment", source="Project Charter", confidence="High", action_type="new_task", is_approved=True),
-    Task(project="Unspecified", source_date_iso=None, project_timezone="Unspecified", task="Finalize Architectural Blueprints", owner="Julia", due_date_raw="April 5, 2026", due_date_iso=date(2026, 4, 5),
-         status="Done", dependency=None, source="Project Charter", confidence="High", action_type="new_task", is_approved=True),
-    Task(project="Unspecified", source_date_iso=None, project_timezone="Unspecified", task="Procure Steel Supply", owner="Fatemeh", due_date_raw="April 10, 2026", due_date_iso=date(2026, 4, 10), status="Done",
-         dependency="Finalize Architectural Blueprints", source="Project Charter", confidence="High", action_type="new_task", is_approved=True),
-    Task(project="Unspecified", source_date_iso=None, project_timezone="Unspecified", task="Contractor Site Mobilization", owner="David", due_date_raw="April 12, 2026", due_date_iso=date(2026, 4, 12), status="In Progress",
-         dependency="Zoning Board Approval", source="Project Charter", confidence="High", action_type="new_task", is_approved=True),
+DATA_DIR = Path(__file__).resolve().parent.parent / "CWB_SJ"
 
-    # Phase 2: Foundation & Framework
-    Task(project="Unspecified", source_date_iso=None, project_timezone="Unspecified", task="Site Clearing and Excavation", owner="David", due_date_raw="April 14, 2026", due_date_iso=date(2026, 4, 14), status="In Progress",
-         dependency="Contractor Site Mobilization", source="Project Charter", confidence="High", action_type="new_task", is_approved=True),
-    Task(project="Unspecified", source_date_iso=None, project_timezone="Unspecified", task="Pour Concrete Foundation", owner="David", due_date_raw="April 20, 2026", due_date_iso=date(2026, 4, 20), status="Not Started",
-         dependency="Site Clearing and Excavation", source="Project Charter", confidence="High", action_type="new_task", is_approved=True),
-    Task(project="Unspecified", source_date_iso=None, project_timezone="Unspecified", task="Foundation Curing Period", owner=None, due_date_raw="April 27, 2026", due_date_iso=date(2026, 4, 27), status="Not Started",
-         dependency="Pour Concrete Foundation", source="Project Charter", confidence="High", action_type="new_task", is_approved=True),
-    Task(project="Unspecified", source_date_iso=None, project_timezone="Unspecified", task="Underground Utilities Routing", owner="Chris", due_date_raw="May 2, 2026", due_date_iso=date(2026, 5, 2), status="Not Started",
-         dependency="Pour Concrete Foundation", source="Project Charter", confidence="High", action_type="new_task", is_approved=True),
-    Task(project="Unspecified", source_date_iso=None, project_timezone="Unspecified", task="Erect Main Steel Framework", owner="Sarah", due_date_raw="May 15, 2026", due_date_iso=date(2026, 5, 15), status="Not Started",
-         dependency="Foundation Curing Period", source="Project Charter", confidence="High", action_type="new_task", is_approved=True),
+REQUIRED_CSV_FILES = ["people.csv", "projects.csv", "dependencies.csv", "tasks_master.csv"]
 
-    # Phase 3: Infrastructure & Systems
-    Task(project="Unspecified", source_date_iso=None, project_timezone="Unspecified", task="Roofing Installation", owner="Sarah", due_date_raw="June 5, 2026", due_date_iso=date(2026, 6, 5), status="Not Started",
-         dependency="Erect Main Steel Framework", source="Project Charter", confidence="High", action_type="new_task", is_approved=True),
-    Task(project="Unspecified", source_date_iso=None, project_timezone="Unspecified", task="HVAC System Installation", owner="Michael", due_date_raw="June 20, 2026", due_date_iso=date(2026, 6, 20), status="Not Started",
-         dependency="Roofing Installation", source="Project Charter", confidence="High", action_type="new_task", is_approved=True),
-    Task(project="Unspecified", source_date_iso=None, project_timezone="Unspecified", task="Electrical Main Wiring", owner="Michael", due_date_raw="July 1, 2026", due_date_iso=date(2026, 7, 1), status="Not Started",
-         dependency="Roofing Installation", source="Project Charter", confidence="High", action_type="new_task", is_approved=True),
-    Task(project="Unspecified", source_date_iso=None, project_timezone="Unspecified", task="Plumbing Mains", owner="Chris", due_date_raw="July 1, 2026", due_date_iso=date(2026, 7, 1), status="Not Started",
-         dependency="Underground Utilities Routing", source="Project Charter", confidence="High", action_type="new_task", is_approved=True),
-    Task(project="Unspecified", source_date_iso=None, project_timezone="Unspecified", task="Elevator Shaft Construction", owner="Sarah", due_date_raw="July 15, 2026", due_date_iso=date(2026, 7, 15), status="Not Started",
-         dependency="Erect Main Steel Framework", source="Project Charter", confidence="High", action_type="new_task", is_approved=True),
+if not DATA_DIR.is_dir():
+    raise RuntimeError(
+        f"Dataset directory not found: {DATA_DIR}\n"
+        "The CWB_SJ submodule has not been initialized. Run:\n"
+        "    git submodule update --init --recursive"
+    )
 
-    # Phase 4: Interiors & Finishing
-    Task(project="Unspecified", source_date_iso=None, project_timezone="Unspecified", task="Interior Drywall Setup", owner="Julia", due_date_raw="August 10, 2026", due_date_iso=date(2026, 8, 10), status="Not Started",
-         dependency="HVAC System Installation", source="Project Charter", confidence="High", action_type="new_task", is_approved=True),
-    Task(project="Unspecified", source_date_iso=None, project_timezone="Unspecified", task="Platform Tiling", owner="Fatemeh", due_date_raw="August 25, 2026", due_date_iso=date(2026, 8, 25), status="Not Started",
-         dependency="Interior Drywall Setup", source="Project Charter", confidence="High", action_type="new_task", is_approved=True),
-    Task(project="Unspecified", source_date_iso=None, project_timezone="Unspecified", task="Turnstile & Ticketing Systems", owner="Ikhlas", due_date_raw="September 5, 2026", due_date_iso=date(2026, 9, 5), status="Not Started",
-         dependency="Electrical Main Wiring", source="Project Charter", confidence="High", action_type="new_task", is_approved=True),
+missing_files = [f for f in REQUIRED_CSV_FILES if not (DATA_DIR / f).is_file()]
+if missing_files:
+    raise RuntimeError(
+        f"Missing expected CSV file(s) in {DATA_DIR}: {', '.join(missing_files)}\n"
+        "Ensure the submodule is fully populated by running:\n"
+        "    git submodule update --init --recursive"
+    )
 
-    # Phase 5: Testing & Handover
-    Task(project="Unspecified", source_date_iso=None, project_timezone="Unspecified", task="Safety Inspection Phase 1", owner=None, due_date_raw=None, due_date_iso=None, status="Not Started",
-         dependency=None, source="Project Charter", confidence="Low", action_type="conflict_needs_clarification", is_approved=True),
-    Task(project="Unspecified", source_date_iso=None, project_timezone="Unspecified", task="City Handover Certification", owner="Doreen", due_date_raw="October 1, 2026", due_date_iso=date(2026, 10, 1), status="Not Started",
-         dependency="Safety Inspection Phase 1", source="Project Charter", confidence="Medium", action_type="new_task", is_approved=True),
-]
 
-print("Seeding baseline data to Azure...")
+def read_csv_rows(filename: str) -> list[dict[str, str]]:
+    with (DATA_DIR / filename).open(newline="", encoding="utf-8") as csv_file:
+        return list(csv.DictReader(csv_file))
+
+
+def parse_date(value: str | None) -> date | None:
+    if value is None:
+        return None
+
+    cleaned_value = value.strip()
+    if not cleaned_value:
+        return None
+
+    return date.fromisoformat(cleaned_value)
+
+
+def parse_int(value: str | None) -> int | None:
+    if value is None:
+        return None
+
+    cleaned_value = value.strip()
+    if not cleaned_value:
+        return None
+
+    return int(cleaned_value)
+
+
+def clear_tables(db) -> None:
+    db.query(Dependency).delete()
+    db.query(Task).delete()
+    db.query(Person).delete()
+    db.query(Project).delete()
+
+
+def seed_people(rows: list[dict[str, str]]) -> list[Person]:
+    return [
+        Person(
+            person_id=row["person_id"],
+            display_name=row["display_name"],
+            role=row["role"] or None,
+            discipline=row["discipline"] or None,
+            region=row["region"] or None,
+            email=row["email"] or None,
+        )
+        for row in rows
+    ]
+
+
+def seed_projects(rows: list[dict[str, str]]) -> list[Project]:
+    return [
+        Project(
+            project_id=row["project_id"],
+            project_name=row["project_name"] or "Unspecified",
+            project_timezone="Unspecified",
+            region=row["region"] or "Unspecified",
+            start_date=row["start_date"] or None,
+            target_end_date=row["target_end_date"] or None,
+            contract_type=row["contract_type"] or "Unspecified",
+        )
+        for row in rows
+    ]
+
+
+def seed_dependencies(rows: list[dict[str, str]]) -> list[Dependency]:
+    return [
+        Dependency(
+            dependency_id=row["dependency_id"],
+            predecessor_task_id=row["predecessor_task_id"],
+            successor_task_id=row["successor_task_id"],
+            dependency_type=row["dependency_type"],
+        )
+        for row in rows
+    ]
+
+
+def seed_tasks(rows: list[dict[str, str]]) -> list[Task]:
+    return [
+        Task(
+            task_id=row["task_id"],
+            project_id=row["project_id"],
+            task_title=row["task_title"],
+            source_date_iso=None,
+            owner_id=row["owner_id"] or None,
+            owner_name=row["owner_name"] or None,
+            start_date_raw=row["planned_start"] or None,
+            planned_start=parse_date(row["planned_start"]),
+            due_date_raw=row["planned_due"] or None,
+            planned_due=parse_date(row["planned_due"]),
+            status=row["status"] or "Not started",
+            dependency=None,
+            percent_complete=parse_int(row["percent_complete"]),
+            priority=row["priority"] or "Low",
+            source="tasks_master.csv",
+            confidence="High",
+            action_type="seeded_baseline",
+            is_approved=True,
+        )
+        for row in rows
+    ]
+
+
+print("Seeding baseline data from CWB_SJ dataset...")
+
 db = SessionLocal()
 try:
-    db.add_all(baseline_tasks)
+    clear_tables(db)
+
+    people = seed_people(read_csv_rows("people.csv"))
+    projects = seed_projects(read_csv_rows("projects.csv"))
+    dependencies = seed_dependencies(read_csv_rows("dependencies.csv"))
+    tasks = seed_tasks(read_csv_rows("tasks_master.csv"))
+
+    db.add_all(people)
+    db.add_all(projects)
+    db.add_all(tasks)
+    db.add_all(dependencies)
     db.commit()
-    print(f"Successfully seeded {len(baseline_tasks)} baseline tasks!")
+
+    print(
+        f"Successfully seeded {len(people)} people, {len(projects)} projects, {len(tasks)} tasks, and {len(dependencies)} dependencies.")
 except Exception as e:
     db.rollback()
     print(f"Error seeding data: {e}")

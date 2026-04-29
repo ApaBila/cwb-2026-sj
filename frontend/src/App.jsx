@@ -21,7 +21,7 @@ function App() {
   const [message, setMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
-  const [drafts, setDrafts] = useState({})
+  const [drafts, setDrafts] = useState([])
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [isCommitting, setIsCommitting] = useState(false)
   const [commitError, setCommitError] = useState('')
@@ -35,7 +35,7 @@ function App() {
         throw new Error('Failed to fetch drafts')
       }
       const data = await response.json()
-      setDrafts(data)
+      setDrafts(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Error fetching drafts:', error)
     }
@@ -92,7 +92,7 @@ function App() {
   }
 
   function toggleSelectAll() {
-    const draftIds = Object.keys(drafts).map(id => parseInt(id))
+    const draftIds = drafts.map((draft) => draft.task_id).filter(Boolean)
     if (selectedIds.size === draftIds.length && draftIds.length > 0) {
       setSelectedIds(new Set())
     } else {
@@ -159,12 +159,12 @@ function App() {
         <div className="panel panel-right">
           <div className="drafts-container">
             <div className="drafts-header">
-              <h3 className="drafts-title">Drafts ({Object.keys(drafts).length})</h3>
-              {Object.keys(drafts).length > 0 && (
+              <h3 className="drafts-title">Drafts ({drafts.length})</h3>
+              {drafts.length > 0 && (
                 <label className="select-all-label">
                   <input
                     type="checkbox"
-                    checked={selectedIds.size === Object.keys(drafts).length && Object.keys(drafts).length > 0}
+                    checked={selectedIds.size === drafts.length && drafts.length > 0}
                     onChange={toggleSelectAll}
                     className="select-all-checkbox"
                   />
@@ -172,22 +172,22 @@ function App() {
                 </label>
               )}
             </div>
-            {Object.keys(drafts).length === 0 ? (
+            {drafts.length === 0 ? (
               <p className="no-drafts">No drafts yet. Submit meeting notes to create tasks.</p>
             ) : (
               <ul className="drafts-list">
-                {Object.entries(drafts).map(([taskId, task]) => (
-                  <li key={taskId} className="draft-item">
+                {drafts.map((task) => (
+                  <li key={task.task_id} className="draft-item">
                     <label className="draft-checkbox-label">
                       <input
                         type="checkbox"
-                        checked={selectedIds.has(parseInt(taskId))}
-                        onChange={() => toggleDraftSelection(parseInt(taskId))}
+                        checked={selectedIds.has(task.task_id)}
+                        onChange={() => toggleDraftSelection(task.task_id)}
                         className="draft-checkbox"
                       />
                       <div className="draft-content">
                         <div className="draft-header">
-                          <strong>{task.task}</strong>
+                          <strong>{task.task_title}</strong>
                           <div className="draft-badges">
                             <span className={`confidence-badge confidence-${task.confidence?.toLowerCase()}`}>
                               {task.confidence}
@@ -200,22 +200,22 @@ function App() {
                         <div className="draft-details">
                           <div className="detail-row">
                             <span className="detail-label">Project:</span>
-                            <span className="detail-value">{task.project}</span>
+                          <span className="detail-value">{task.project_id}</span>
                           </div>
                           <div className="detail-row">
                             <span className="detail-label">Status:</span>
                             <span className="detail-value">{task.status}</span>
                           </div>
-                          {task.owner && (
+                          {task.owner_name && (
                             <div className="detail-row">
                               <span className="detail-label">Owner:</span>
-                              <span className="detail-value">{task.owner}</span>
+                              <span className="detail-value">{task.owner_name}</span>
                             </div>
                           )}
-                          {task.due_date_iso && (
+                          {task.planned_due && (
                             <div className="detail-row">
                               <span className="detail-label">Due Date:</span>
-                              <span className="detail-value">{task.due_date_iso}</span>
+                              <span className="detail-value">{task.planned_due}</span>
                             </div>
                           )}
                           {task.due_date_raw && (

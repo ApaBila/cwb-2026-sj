@@ -1,8 +1,7 @@
 from fastapi import FastAPI, Body, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from .services.spec_catcher import catch_spec
-import json
-from .schemas import TaskUpdateList, UpdateRequest
+from .services.update_formatter import format_update
+from .schemas import UpdateRequest
 from openai import APIStatusError
 from .database import SessionLocal
 from .services.change_detector import detect_changes_batched
@@ -36,28 +35,18 @@ async def project_update(request_text: UpdateRequest):
     user_text = request_text.user_text
 
     try:
-        ai_response = catch_spec(user_text, no_ai=request_text.no_ai)
-
-        try:
-            raw_response = json.loads(ai_response)  # type: ignore
-        except json.JSONDecodeError:
-            raise HTTPException(
-                status_code=500, detail="AI did not return valid JSON.")
-        try:
-            validated_response = TaskUpdateList(**raw_response)
-        except APIStatusError as e:
-            raise HTTPException(
-                status_code=e.status_code,
-                detail=e.message
-            )
-        # Check action types for all tasks and detect changes
-        with SessionLocal() as db:
-            detect_changes_batched(db, validated_response.tasks)
-
-        return validated_response.model_dump(mode='json')
-    except Exception as e:
+        ai_response = await format_update(user_text, no_ai=request_text.no_ai)
+        print(ai_response)
+    except APIStatusError as e:
         raise HTTPException(
-            status_code=500, detail=f"Error processing the request: {str(e)}")
+            status_code=e.status_code,
+            detail=e.message
+        )
+    # Check action types for all tasks and detect changes
+    with SessionLocal() as db:
+        detect_changes_batched(db, ai_response.tasks)
+
+    return ai_response.model_dump(mode='json')
 
 
 @app.get("/api/drafts")
@@ -65,17 +54,17 @@ async def get_drafts():
     with SessionLocal() as db:
         results = db.execute(
             text("SELECT * FROM tasks WHERE is_approved = false")).mappings()
-        drafts = {result["id"]: dict(result) for result in results}
-    return drafts
+    return [dict(result) for result in results]
 
 
 @app.put("/api/commit")
 async def commit_updates(request_text: CommitUpdate):
-    task_ids = request_text.task_ids
+    task_ids = [str(task_id).strip()
+                for task_id in request_text.task_ids if str(task_id).strip()]
     with SessionLocal() as db:
         try:
             tasks_to_commit = db.query(Task).filter(
-                Task.id.in_(task_ids)).all()
+                Task.task_id.in_(task_ids)).all()
 
             if not tasks_to_commit:
                 raise HTTPException(

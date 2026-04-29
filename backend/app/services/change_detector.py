@@ -4,15 +4,18 @@ from ..models import Task, Project, Person, Dependency
 from ..schemas import TaskUpdate
 from agent_framework import tool
 from app.database import SessionLocal
+from sqlalchemy import text
+
+# https://github.com/Azure-Samples/postgres-agents/tree/main/azure-ai-agent-service
 
 
 @tool(approval_mode="never_require")
 def query_existing_tasks(query_str: str):
-    """Tool function to query existing tasks from the database. This can be used by the AI agent to compare against incoming task updates for change detection."""
+    """Tool function to query the database. This can be used by the AI agent to compare against incoming task updates for change detection."""
     with SessionLocal() as db:
-        tasks = db.query(Task).filter(
-            Task.task_title.contains(query_str)).all()
-    return tasks
+        result = db.execute(text(query_str)).all()
+    print(result)
+    return result
 
 
 def detect_changes_batched(db: Session, task_updates: list[TaskUpdate]):

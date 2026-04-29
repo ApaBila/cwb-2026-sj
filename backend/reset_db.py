@@ -17,5 +17,5 @@ with engine.begin() as connection:
         text("TRUNCATE TABLE dependencies, tasks, people, projects RESTART IDENTITY;")
     )
     print(
-        "Success: The dependencies, tasks, people, and projects tables have been wiped clean and IDs reset to 1."
+        "Success: The dependencies, tasks, people, and projects tables have been wiped clean."
     )

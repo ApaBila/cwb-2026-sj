@@ -1,8 +1,7 @@
 from fastapi import FastAPI, Body, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from .services.update_formatter import format_update
-import json
-from .schemas import TaskUpdateList, UpdateRequest
+from .schemas import UpdateRequest
 from openai import APIStatusError
 from .database import SessionLocal
 from .services.change_detector import detect_changes_batched

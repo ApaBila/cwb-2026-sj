@@ -12,7 +12,7 @@ REQUIRED_CSV_FILES = ["people.csv", "projects.csv", "dependencies.csv", "tasks_m
 if not DATA_DIR.is_dir():
     raise RuntimeError(
         f"Dataset directory not found: {DATA_DIR}\n"
-        "The CWB_SJ submodule has not been initialised. Run:\n"
+        "The CWB_SJ submodule has not been initialized. Run:\n"
         "    git submodule update --init --recursive"
     )
 

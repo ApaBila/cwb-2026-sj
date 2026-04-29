@@ -59,7 +59,8 @@ async def get_drafts():
 
 @app.put("/api/commit")
 async def commit_updates(request_text: CommitUpdate):
-    task_ids = request_text.task_ids
+    task_ids = [str(task_id).strip()
+                for task_id in request_text.task_ids if str(task_id).strip()]
     with SessionLocal() as db:
         try:
             tasks_to_commit = db.query(Task).filter(

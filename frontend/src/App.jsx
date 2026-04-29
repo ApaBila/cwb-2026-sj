@@ -61,7 +61,7 @@ function App() {
         },
         body: JSON.stringify({
           user_text: message,
-          no_ai: false,
+          no_ai: true,
         }),
       })
 

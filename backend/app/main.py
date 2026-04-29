@@ -37,27 +37,27 @@ async def project_update(request_text: UpdateRequest):
 
     try:
         ai_response = await format_update(user_text, no_ai=request_text.no_ai)
-
-        try:
-            raw_response = json.loads(ai_response)  # type: ignore
-        except json.JSONDecodeError:
-            raise HTTPException(
-                status_code=500, detail="AI did not return valid JSON.")
-        try:
-            validated_response = TaskUpdateList(**raw_response)
-        except APIStatusError as e:
-            raise HTTPException(
-                status_code=e.status_code,
-                detail=e.message
-            )
-        # Check action types for all tasks and detect changes
-        with SessionLocal() as db:
-            detect_changes_batched(db, validated_response.tasks)
-
-        return validated_response.model_dump(mode='json')
-    except Exception as e:
+    except APIStatusError as e:
         raise HTTPException(
-            status_code=500, detail=f"Error processing the request: {str(e)}")
+            status_code=e.status_code,
+            detail=e.message
+        )
+    # try:
+    #     raw_response = json.loads(ai_response)  # type: ignore
+    # except json.JSONDecodeError:
+    #     raise HTTPException(
+    #         status_code=500, detail=f"AI did not return valid JSON, AI response: {ai_response}")
+    # try:
+    #     validated_response = TaskUpdateList(**ai_response)
+    # except Exception as e:
+    #     raise HTTPException(
+    #         status_code=500, detail=f"Error parsing the request: {str(e)}, AI response: {ai_response}, consider checking if the system prompt matches the expected output format in schemas.py")
+
+    # Check action types for all tasks and detect changes
+    with SessionLocal() as db:
+        detect_changes_batched(db, ai_response.tasks)
+
+    return ai_response.model_dump(mode='json')
 
 
 @app.get("/api/drafts")

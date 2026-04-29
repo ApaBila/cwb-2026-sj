@@ -9,17 +9,19 @@ def detect_changes_batched(db: Session, task_updates: list[TaskUpdate]):
     Adds the tasks from the AI with the appropriate action type and approval set to False for the frontend 
     to display and allow the user to approve or reject.
     Prints to terminal of uvicorn for debugging purposes."""
-    task_names = [t.task for t in task_updates]
-    existing_tasks = db.query(Task).filter(Task.task.in_(task_names)).all()
-    existing_task_map = {task.task: task for task in existing_tasks}
+    task_names = [t.task_title for t in task_updates]
+    existing_tasks = db.query(Task).filter(
+        Task.task_title.in_(task_names)).all()
+    existing_task_map = {task.task_title: task for task in existing_tasks}
 
     update_drafts = []
 
     for task_update in task_updates:
-        print("Detecting changes for task:", task_update.task)
+        print("Detecting changes for task:", task_update.task_title)
         print("Action type from AI:", task_update.action_type)
 
-        existing_task = existing_task_map.get(task_update.task)  # type: ignore
+        existing_task = existing_task_map.get(
+            task_update.task_title)  # type: ignore
 
         if existing_task:
             if task_update.action_type in ["new_task", "conflict_needs_clarification"]:

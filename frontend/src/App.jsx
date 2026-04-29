@@ -61,7 +61,7 @@ function App() {
         },
         body: JSON.stringify({
           user_text: message,
-          no_ai: true,
+          no_ai: false,
         }),
       })
 
@@ -92,7 +92,7 @@ function App() {
   }
 
   function toggleSelectAll() {
-    const draftIds = Object.keys(drafts).map(id => parseInt(id))
+    const draftIds = Object.keys(drafts)
     if (selectedIds.size === draftIds.length && draftIds.length > 0) {
       setSelectedIds(new Set())
     } else {
@@ -181,8 +181,8 @@ function App() {
                     <label className="draft-checkbox-label">
                       <input
                         type="checkbox"
-                        checked={selectedIds.has(parseInt(taskId))}
-                        onChange={() => toggleDraftSelection(parseInt(taskId))}
+                        checked={selectedIds.has(taskId)}
+                        onChange={() => toggleDraftSelection(taskId)}
                         className="draft-checkbox"
                       />
                       <div className="draft-content">

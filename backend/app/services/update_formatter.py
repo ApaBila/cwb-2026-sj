@@ -1,3 +1,4 @@
+import uuid
 from agent_framework import Agent
 from agent_framework.foundry import FoundryChatClient
 from azure.identity import AzureCliCredential
@@ -35,15 +36,17 @@ agent = Agent(
 
 async def format_update(text: str, no_ai: bool = False):
     if no_ai:
+        # Generate unique task_id for each draft to avoid primary key conflicts
+        draft_task_id = f"DRAFT_{uuid.uuid4().hex[:8].upper()}"
         return TaskUpdateList(
             tasks=[
                 TaskUpdate(
-                    project_id="Unspecified",
+                    project_id=None,
                     project_name="Unspecified",
                     project_timezone="Unspecified",
                     source_date_iso=None,
-                    task_id="Unspecified",
-                    task_title="Unspecified",
+                    task_id=draft_task_id,
+                    task_title="[DRAFT] Sample Task",
                     discipline=None,
                     owner_id=None,
                     owner_name=None,

@@ -65,7 +65,7 @@ async def get_drafts():
     with SessionLocal() as db:
         results = db.execute(
             text("SELECT * FROM tasks WHERE is_approved = false")).mappings()
-        drafts = {result["id"]: dict(result) for result in results}
+        drafts = {result["task_id"]: dict(result) for result in results}
     return drafts
 
 
@@ -75,7 +75,7 @@ async def commit_updates(request_text: CommitUpdate):
     with SessionLocal() as db:
         try:
             tasks_to_commit = db.query(Task).filter(
-                Task.id.in_(task_ids)).all()
+                Task.task_id.in_(task_ids)).all()
 
             if not tasks_to_commit:
                 raise HTTPException(

@@ -187,7 +187,7 @@ function App() {
                       />
                       <div className="draft-content">
                         <div className="draft-header">
-                          <strong>{task.task}</strong>
+                          <strong>{task.task_title}</strong>
                           <div className="draft-badges">
                             <span className={`confidence-badge confidence-${task.confidence?.toLowerCase()}`}>
                               {task.confidence}
@@ -200,22 +200,22 @@ function App() {
                         <div className="draft-details">
                           <div className="detail-row">
                             <span className="detail-label">Project:</span>
-                            <span className="detail-value">{task.project}</span>
+                          <span className="detail-value">{task.project_id}</span>
                           </div>
                           <div className="detail-row">
                             <span className="detail-label">Status:</span>
                             <span className="detail-value">{task.status}</span>
                           </div>
-                          {task.owner && (
+                          {task.owner_name && (
                             <div className="detail-row">
                               <span className="detail-label">Owner:</span>
-                              <span className="detail-value">{task.owner}</span>
+                              <span className="detail-value">{task.owner_name}</span>
                             </div>
                           )}
-                          {task.due_date_iso && (
+                          {task.planned_due && (
                             <div className="detail-row">
                               <span className="detail-label">Due Date:</span>
-                              <span className="detail-value">{task.due_date_iso}</span>
+                              <span className="detail-value">{task.planned_due}</span>
                             </div>
                           )}
                           {task.due_date_raw && (

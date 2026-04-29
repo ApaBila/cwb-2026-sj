@@ -1,12 +1,10 @@
 import uuid
-from agent_framework import Agent, AgentResponseUpdate, WorkflowBuilder
+from agent_framework import Agent
 from agent_framework.foundry import FoundryChatClient
 from azure.identity import AzureCliCredential
 
 from app.schemas import TaskUpdateList, TaskUpdate
 from app.services.change_detector import query_existing_tasks
-
-# https://github.com/microsoft/agent-framework/blob/main/python/samples/03-workflows/agents/azure_ai_agents_streaming.py
 
 client = FoundryChatClient(
     project_endpoint="https://cwb-sj-planner.services.ai.azure.com/api/projects/cwb-sj-planner",
@@ -47,11 +45,6 @@ formatter_agent = Agent(
     Pay attention to confidence and action_type.
     """,
 )
-
-# workflow = WorkflowBuilder(start_executor=updater_agent).add_edge(
-#     updater_agent, change_detection_agent).build()
-
-# last_author: str | None = None
 
 
 async def format_update(text: str, no_ai: bool = False):
@@ -99,21 +92,3 @@ async def format_update(text: str, no_ai: bool = False):
         options={"response_format": TaskUpdateList}
     )
     return formatter_response.value
-
-    # events = workflow.run(text, stream=True)
-    # async for event in events:
-    #     # The outputs of the workflow are whatever the agents produce. So the events are expected to
-    #     # contain `AgentResponseUpdate` from the agents in the workflow.
-    #     if event.type == "output" and isinstance(event.data, AgentResponseUpdate):
-    #         update = event.data
-    #         author = update.author_name
-    #         if author != last_author:
-    #             if last_author is not None:
-    #                 print()  # Newline between different authors
-    #             print(f"{author}: {update.text}", end="", flush=True)
-    #             last_author = author
-    #         else:
-    #             print(update.text, end="", flush=True)
-
-    # # return final response
-    # return events.get_final_response()

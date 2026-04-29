@@ -42,17 +42,6 @@ async def project_update(request_text: UpdateRequest):
             status_code=e.status_code,
             detail=e.message
         )
-    # try:
-    #     raw_response = json.loads(ai_response)  # type: ignore
-    # except json.JSONDecodeError:
-    #     raise HTTPException(
-    #         status_code=500, detail=f"AI did not return valid JSON, AI response: {ai_response}")
-    # try:
-    #     validated_response = TaskUpdateList(**ai_response)
-    # except Exception as e:
-    #     raise HTTPException(
-    #         status_code=500, detail=f"Error parsing the request: {str(e)}, AI response: {ai_response}, consider checking if the system prompt matches the expected output format in schemas.py")
-
     # Check action types for all tasks and detect changes
     with SessionLocal() as db:
         detect_changes_batched(db, ai_response.tasks)
@@ -65,8 +54,7 @@ async def get_drafts():
     with SessionLocal() as db:
         results = db.execute(
             text("SELECT * FROM tasks WHERE is_approved = false")).mappings()
-        drafts = {result["task_id"]: dict(result) for result in results}
-    return drafts
+    return [dict(result) for result in results]
 
 
 @app.put("/api/commit")

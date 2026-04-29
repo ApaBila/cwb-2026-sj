@@ -37,6 +37,7 @@ async def project_update(request_text: UpdateRequest):
 
     try:
         ai_response = await format_update(user_text, no_ai=request_text.no_ai)
+        print(ai_response)
     except APIStatusError as e:
         raise HTTPException(
             status_code=e.status_code,

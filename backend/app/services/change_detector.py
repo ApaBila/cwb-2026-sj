@@ -11,7 +11,16 @@ from sqlalchemy import text
 
 @tool(approval_mode="never_require")
 def query_existing_tasks(query_str: str):
-    """Tool function to query the database. This can be used by the AI agent to compare against incoming task updates for change detection."""
+    """Tool function to query the database. 
+    Must be one query that starts with SELECT. 
+    This can be used by the AI agent to compare against incoming task updates for change detection.
+    All tables can be queried, including tasks, projects, people, dependencies."""
+    if not query_str.strip().upper().startswith("SELECT"):
+        raise ValueError("Only SELECT queries are allowed")
+
+    if ";" in query_str.strip().rstrip(";"):
+        raise ValueError("Only one query at a time is allowed")
+
     with SessionLocal() as db:
         result = db.execute(text(query_str)).all()
     print(result)
@@ -21,7 +30,7 @@ def query_existing_tasks(query_str: str):
 def detect_changes_batched(db: Session, task_updates: list[TaskUpdate]):
     """Detects if the tasks caught by the AI are new, updates, or require clarification due to conflicts 
     based on the existing task data in Azure's PostgreSQL database. 
-    Also validates that referenced projects, people, and dependencies exist.
+    Also validates that referenced projects, people exist.
     Adds the tasks from the AI with the appropriate action type and approval set to False for the frontend 
     to display and allow the user to approve or reject.
     Prints to terminal of uvicorn for debugging purposes."""

@@ -137,191 +137,92 @@ function App() {
   }
 
   return (
-    <main className="page-shell">
-      <section className="panel-layout" aria-label="Approval workspace">
-        
-        <div className="panel panel-left">
-          <textarea
-            id="message-input"
-            className="message-input"
-            type="text"
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            placeholder="Type your meeting notes here"
-          />
-          <SubmitButton
-            onClick={handleSubmit}
-            disabled={!message.trim() || isSubmitting}
-            loading={isSubmitting}
-          />
-          {submitError && <p className="submit-error">{submitError}</p>}
-        </div>
+    <main>
+      <section className="compose-block" aria-label="Project update input">
+        <textarea
+          id="message-input"
+          className="message-input"
+          type="text"
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+          placeholder="Type your project updates here"
+        />
+        <SubmitButton
+          onClick={handleSubmit}
+          disabled={!message.trim() || isSubmitting}
+          loading={isSubmitting}
+        />
+        {submitError && <p className="submit-error">{submitError}</p>}
+      </section>
 
-        <div className="panel panel-right">
-          {/* <div className="drafts-container">
-            <div className="drafts-header">
-              <h3 className="drafts-title">Drafts ({drafts.length})</h3>
-              {drafts.length > 0 && (
-                <label className="select-all-label">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.size === drafts.length && drafts.length > 0}
-                    onChange={toggleSelectAll}
-                    className="select-all-checkbox"
-                  />
-                  <span>Select all</span>
-                </label>
-              )}
-            </div>
-            {drafts.length === 0 ? (
-              <p className="no-drafts">No drafts yet. Submit meeting notes to create tasks.</p>
-            ) : (
-              <ul className="drafts-list">
-                {drafts.map((task) => (
-                  <li key={task.task_id} className="draft-item">
-                    <label className="draft-checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(task.task_id)}
-                        onChange={() => toggleDraftSelection(task.task_id)}
-                        className="draft-checkbox"
+      <section className="drafts-block" aria-label="Approval workspace">
+        <div className="drafts-container">
+          {drafts.length === 0 ? (
+            <p className="no-drafts">No drafts to approve. Try submitting project updates to AI via the input box above.</p>
+          ) : (
+            <>
+              <Table hoverable striped>
+                <TableHead>
+                  <TableRow>
+                    <TableHeadCell>Project</TableHeadCell>
+                    <TableHeadCell>Task</TableHeadCell>
+                    <TableHeadCell>Owner</TableHeadCell>
+                    <TableHeadCell>Start Date</TableHeadCell>
+                    <TableHeadCell>Due Date</TableHeadCell>
+                    <TableHeadCell>Status</TableHeadCell>
+                    <TableHeadCell>Dependency</TableHeadCell>
+                    <TableHeadCell>Percent Complete</TableHeadCell>
+                    <TableHeadCell>Priority</TableHeadCell>
+                    <TableHeadCell>Action Type</TableHeadCell>
+                    <TableHeadCell>Confidence</TableHeadCell>
+                    <TableHeadCell>
+                      <Checkbox
+                        checked={selectedIds.size === drafts.length && drafts.length > 0}
+                        onChange={toggleSelectAll}
                       />
-                      <div className="draft-content">
-                        <div className="draft-header">
-                          <strong>{task.task_title}</strong>
-                          <div className="draft-badges">
-                            <span className={`confidence-badge confidence-${task.confidence?.toLowerCase()}`}>
-                              {task.confidence}
-                            </span>
-                            <span className="action-type-badge">
-                              {task.action_type?.replace(/_/g, ' ')}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="draft-details">
-                          <div className="detail-row">
-                            <span className="detail-label">Project:</span>
-                          <span className="detail-value">{task.project_id}</span>
-                          </div>
-                          <div className="detail-row">
-                            <span className="detail-label">Status:</span>
-                            <span className="detail-value">{task.status}</span>
-                          </div>
-                          {task.owner_name && (
-                            <div className="detail-row">
-                              <span className="detail-label">Owner:</span>
-                              <span className="detail-value">{task.owner_name}</span>
-                            </div>
-                          )}
-                          {task.planned_due && (
-                            <div className="detail-row">
-                              <span className="detail-label">Due Date:</span>
-                              <span className="detail-value">{task.planned_due}</span>
-                            </div>
-                          )}
-                          {task.due_date_raw && (
-                            <div className="detail-row">
-                              <span className="detail-label">Due (raw):</span>
-                              <span className="detail-value">{task.due_date_raw}</span>
-                            </div>
-                          )}
-                          {task.dependency && (
-                            <div className="detail-row">
-                              <span className="detail-label">Dependency:</span>
-                              <span className="detail-value">{task.dependency}</span>
-                            </div>
-                          )}
-                          {task.source && (
-                            <div className="detail-row">
-                              <span className="detail-label">Source:</span>
-                              <span className="detail-value">{task.source}</span>
-                            </div>
-                          )}
-                          {task.source_date_iso && (
-                            <div className="detail-row">
-                              <span className="detail-label">Source Date:</span>
-                              <span className="detail-value">{task.source_date_iso}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div> */}
-          {/* # https://flowbite-react.com/docs/components/table#table-with-checkboxes */}
-          <div className="drafts-container">
-            {drafts.length === 0 ? (
-              <p className="no-drafts">No drafts to approve. Try submitting meeting notes to AI via the input box on the left.</p> // TODO: use placeholder font
-            ) : (
-              <div className="overflow-x-auto">
-                <Table hoverable>
-                  <TableHead>
-                    <TableRow>
-                      <TableHeadCell>Project</TableHeadCell>
-                      <TableHeadCell>Task</TableHeadCell>
-                      <TableHeadCell>Owner</TableHeadCell>
-                      <TableHeadCell>Start Date</TableHeadCell>
-                      <TableHeadCell>Due Date</TableHeadCell>
-                      <TableHeadCell>Status</TableHeadCell>
-                      <TableHeadCell>Dependency</TableHeadCell>
-                      <TableHeadCell>Percent Complete</TableHeadCell>
-                      <TableHeadCell>Priority</TableHeadCell> 
-                      <TableHeadCell>Action Type</TableHeadCell>
-                      <TableHeadCell>Confidence</TableHeadCell>
-                      <TableHeadCell className="p-4">
-                        <Checkbox 
-                          checked={selectedIds.size === drafts.length && drafts.length > 0}
-                          onChange={toggleSelectAll}
+                    </TableHeadCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {drafts.map((task) => (
+                    <TableRow key={task.task_id}>
+                      <TableCell>
+                        {task.project_id || '—'}
+                      </TableCell>
+                      <TableCell>{task.task_title}</TableCell>
+                      <TableCell>{task.owner_name || '—'}</TableCell>
+                      <TableCell>{task.planned_start || task.start_date_raw || '—'}</TableCell>
+                      <TableCell>{task.planned_due || task.due_date_raw || '—'}</TableCell>
+                      <TableCell>{task.status}</TableCell>
+                      <TableCell>{task.dependency || '—'}</TableCell>
+                      <TableCell>{task.percent_complete != null ? `${task.percent_complete}%` : '—'}</TableCell>
+                      <TableCell>{task.priority || '—'}</TableCell>
+                      <TableCell>{task.action_type?.replace(/_/g, ' ')}</TableCell>
+                      <TableCell>
+                        <span className={`confidence-badge confidence-${task.confidence?.toLowerCase()}`}>
+                          {task.confidence}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(task.task_id)}
+                          onChange={() => toggleDraftSelection(task.task_id)}
                         />
-                      </TableHeadCell>
+                      </TableCell>
                     </TableRow>
-                  </TableHead>
-                  <TableBody className='divide-y'>
-                    {drafts.map((task) => (
-                      <TableRow key={task.task_id} className="bg-white dark:border-gray-700 dark:bg-gray-800">
-                        <TableCell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
-                          {task.project_id || '—'}
-                        </TableCell>
-                        <TableCell>{task.task_title}</TableCell>
-                        <TableCell>{task.owner_name || '—'}</TableCell>
-                        <TableCell>{task.planned_start || task.start_date_raw || '—'}</TableCell>
-                        <TableCell>{task.planned_due || task.due_date_raw || '—'}</TableCell>
-                        <TableCell>{task.status}</TableCell>
-                        <TableCell>{task.dependency || '—'}</TableCell>
-                        <TableCell>{task.percent_complete != null ? `${task.percent_complete}%` : '—'}</TableCell>
-                        <TableCell>{task.priority || '—'}</TableCell>
-                        <TableCell>{task.action_type?.replace(/_/g, ' ')}</TableCell>
-                        <TableCell>
-                           <span className={`confidence-badge confidence-${task.confidence?.toLowerCase()}`}>
-                             {task.confidence}
-                           </span>
-                        </TableCell>
-                        <TableCell className="p-4">
-                          <Checkbox 
-                            checked={selectedIds.has(task.task_id)}
-                            onChange={() => toggleDraftSelection(task.task_id)}
-                          />
-                        </TableCell>  
-                      </TableRow>
-                      ))}               
-                  </TableBody>
-                </Table>
-              </div>
-            )
-          }
-          </div>
-          <ApproveButton
-            onClick={handleCommit}
-            disabled={selectedIds.size === 0 || isCommitting}
-            loading={isCommitting}
-            selectedCount={selectedIds.size}
-          />
-          {commitError && <p className="submit-error">{commitError}</p>}
+                  ))}
+                </TableBody>
+              </Table>
+            </>
+          )}
         </div>
-
+        <ApproveButton
+          onClick={handleCommit}
+          disabled={selectedIds.size === 0 || isCommitting}
+          loading={isCommitting}
+          selectedCount={selectedIds.size}
+        />
+        {commitError && <p className="submit-error">{commitError}</p>}
       </section>
     </main>
   );

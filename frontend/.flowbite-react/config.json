@@ -1,6 +1,14 @@
 {
   "$schema": "https://unpkg.com/flowbite-react/schema.json",
-  "components": [],
+  "components": [
+    "Checkbox",
+    "Table",
+    "TableBody",
+    "TableCell",
+    "TableHead",
+    "TableHeadCell",
+    "TableRow"
+  ],
   "dark": false,
   "path": "src/components",
   "prefix": "",

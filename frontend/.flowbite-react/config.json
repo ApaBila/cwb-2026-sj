@@ -7,7 +7,12 @@
     "TableCell",
     "TableHead",
     "TableHeadCell",
-    "TableRow"
+    "TableRow",
+     "Navbar", 
+     "NavbarBrand", 
+     "NavbarCollapse", 
+     "NavbarLink", 
+     "NavbarToggle"
   ],
   "dark": false,
   "path": "src/components",

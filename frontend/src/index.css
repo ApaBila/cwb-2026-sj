@@ -1,6 +1,6 @@
 @import "tailwindcss";
-@import "flowbite-react/plugin/tailwindcss";
 @source "../.flowbite-react/class-list.json";
+@import "flowbite-react/plugin/tailwindcss";
 
 :root {
   --text: #000;
@@ -27,12 +27,13 @@ body {
 }
 
 #root {
-  width: fit-content;
+  width: 100%;
   min-height: 100svh;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 p {

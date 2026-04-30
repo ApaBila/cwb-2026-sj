@@ -5,6 +5,8 @@ main {
   gap: 24px;
   padding: 24px;
   min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .compose-block,
@@ -80,6 +82,7 @@ main {
   flex-direction: column;
   gap: 16px;
   min-width: 0;
+  overflow-x: auto;
 }
 
 .no-drafts {

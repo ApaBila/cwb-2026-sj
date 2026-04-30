@@ -2,13 +2,15 @@
 @source "../.flowbite-react/class-list.json";
 @import "flowbite-react/plugin/tailwindcss";
 
+@import "@fontsource/metropolis/500.css";
+@import "@fontsource/metropolis/800.css";
+
 :root {
   --text: #000;
   --bg: #FFF;
   --sjblue: #1257FD;
   --sjred: #ED2024;
   --sans: 'Metropolis', 'Montserrat', sans-serif;
-  --heading: 'Metropolis', 'Montserrat', sans-serif;
   --mono: ui-monospace, Consolas, monospace;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -22,7 +24,6 @@ body {
   min-height: 100svh;
   background: var(--bg);
   color: var(--text);
-  font: 18px/145% var(--sans);
   letter-spacing: 0.18px;
 }
 
@@ -38,4 +39,33 @@ body {
 
 p {
   margin: 0;
+}
+
+@layer base {
+  :root {
+    --font-sans: Metropolis, Montserrat, system-ui, -apple-system, 'Segoe UI', Roboto;
+  }
+
+  /* Body text: ~18px mobile (text-lg), 20px desktop (md:text-xl) */
+  body {
+    font-family: var(--font-sans);
+    @apply font-sans text-lg md:text-xl;
+  }
+
+  /* Headings: 24px mobile (text-2xl), 30px desktop (md:text-3xl) */
+  h1, h2, h3 {
+    @apply text-2xl md:text-3xl;
+    color: var(--sjblue);
+    font-weight: bold;
+  }
+
+  /* Error messages: 16px */
+  .error {
+    @apply text-base text-red-600;
+  }
+
+  /* Ensure Flowbite components inherit the same sans font */
+  .flowbite-react, .fb-root, [data-flowbite-root] {
+    font-family: var(--font-sans);
+  }
 }

@@ -151,7 +151,7 @@ function ApproveUpdate() {
           disabled={!message.trim() || isSubmitting}
           loading={isSubmitting}
         />
-        {submitError && <p className="submit-error">{submitError}</p>}
+        {submitError && <p className="error submit-error">{submitError}</p>}
       </section>
 
       <section className="drafts-block" aria-label="Approval workspace">
@@ -221,7 +221,7 @@ function ApproveUpdate() {
           loading={isCommitting}
           selectedCount={selectedIds.size}
         />
-        {commitError && <p className="submit-error">{commitError}</p>}
+        {commitError && <p className="error submit-error">{commitError}</p>}
       </section>
     </main>
   );

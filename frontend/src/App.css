@@ -25,7 +25,7 @@ main {
   padding: 28px;
   box-sizing: border-box;
   font-family: var(--sans);
-  font-size: 24px;
+  font-size: 18px;
   color: var(--text);
   background: var(--bg);
   resize: none;
@@ -70,6 +70,7 @@ main {
   cursor: not-allowed;
 }
 
+.error,
 .submit-error {
   margin: 0;
   color: var(--sjred);
@@ -90,7 +91,7 @@ main {
   color: var(--text);
   opacity: 0.6;
   font-family: var(--sans);
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .confidence-badge {
@@ -98,9 +99,21 @@ main {
   align-items: center;
   padding: 4px 12px;
   border-radius: 999px;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .message-input,
+  .no-drafts,
+  .confidence-badge {
+    font-size: 18px;
+  }
+
+  .blue-button {
+    font-size: 24px;
+  }
 }
 
 .confidence-high {

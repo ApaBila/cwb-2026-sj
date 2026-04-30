@@ -13,16 +13,20 @@ function App() {
     <BrowserRouter>
       <Navbar fluid rounded>
         <NavbarBrand>
-          SJ Project Updater  <br /> 
-          Real impact, <br /> made together
+          <span className="block text-2xl font-semibold leading-none md:text-3xl">
+            <h1> SJ Project Updater </h1>
+          </span>
+          <span className="block ml-10 text-lg font-normal leading-tight md:text-xl">
+            <body> Real impact, <br /> made together </body>
+          </span>
         </NavbarBrand>    
         <NavbarToggle />
         <NavbarCollapse>
-          <NavbarLink as={Link} to="/">
-            Approve Update
+          <NavbarLink as={Link} to="/" className="text-2xl font-semibold md:text-3xl">
+            <h1> Approve Update </h1>
           </NavbarLink>
-          <NavbarLink as={Link} to="/Gantt">
-            Gantt
+          <NavbarLink as={Link} to="/Gantt" className="text-2xl font-semibold md:text-3xl">
+            <h1> Gantt </h1>
           </NavbarLink>
         </NavbarCollapse>
 

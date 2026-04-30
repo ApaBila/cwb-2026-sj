@@ -23,7 +23,7 @@ main {
   padding: 28px;
   box-sizing: border-box;
   font-family: var(--sans);
-  font-size: 18px;
+  font-size: 24px;
   color: var(--text);
   background: var(--bg);
   resize: none;
@@ -51,7 +51,7 @@ main {
   background: var(--sjblue);
   color: var(--bg);
   font-family: var(--sans);
-  font-size: 16px;
+  font-size: 24px;
   font-weight: 1000;
   line-height: 1;
 }
@@ -72,7 +72,7 @@ main {
   margin: 0;
   color: var(--sjred);
   font-family: var(--sans);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .drafts-container {
@@ -87,7 +87,7 @@ main {
   color: var(--text);
   opacity: 0.6;
   font-family: var(--sans);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .confidence-badge {
@@ -95,7 +95,7 @@ main {
   align-items: center;
   padding: 4px 12px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 16px;
   font-weight: 600;
   white-space: nowrap;
 }

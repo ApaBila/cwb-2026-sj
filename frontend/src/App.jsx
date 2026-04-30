@@ -161,7 +161,7 @@ function App() {
             <p className="no-drafts">No drafts to approve. Try submitting project updates to AI via the input box above.</p>
           ) : (
             <>
-              <Table hoverable striped>
+              <Table hoverable>
                 <TableHead>
                   <TableRow>
                     <TableHeadCell>Project</TableHeadCell>

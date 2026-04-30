@@ -13,12 +13,12 @@ function App() {
     <BrowserRouter>
       <Navbar fluid rounded>
         <NavbarBrand>
-          <span className="block text-2xl font-semibold leading-none md:text-3xl">
+          <div className="block text-2xl font-semibold leading-none md:text-3xl">
             <h1> SJ Project Updater </h1>
-          </span>
-          <span className="block ml-10 text-lg font-normal leading-tight md:text-xl">
-            <body> Real impact, <br /> made together </body>
-          </span>
+          </div>
+          <div className="block ml-10 text-lg font-normal leading-tight md:text-xl">
+            Real impact, <br /> made together 
+          </div>
         </NavbarBrand>    
         <NavbarToggle />
         <NavbarCollapse>

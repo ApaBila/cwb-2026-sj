@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import './App.css'
+import { Checkbox, Table, TableBody, TableCell, TableHead, TableHeadCell, TableRow } from "flowbite-react";
 
 function SubmitButton({ onClick, disabled, loading }) {
   return (
@@ -61,7 +62,7 @@ function App() {
         },
         body: JSON.stringify({
           user_text: message,
-          no_ai: false,
+          no_ai: true,
         }),
       })
 
@@ -157,7 +158,7 @@ function App() {
         </div>
 
         <div className="panel panel-right">
-          <div className="drafts-container">
+          {/* <div className="drafts-container">
             <div className="drafts-header">
               <h3 className="drafts-title">Drafts ({drafts.length})</h3>
               {drafts.length > 0 && (
@@ -249,6 +250,68 @@ function App() {
                 ))}
               </ul>
             )}
+          </div> */}
+          {/* # https://flowbite-react.com/docs/components/table#table-with-checkboxes */}
+          <div className="drafts-container">
+            {drafts.length === 0 ? (
+              <p className="no-drafts">No drafts to approve. Try submitting meeting notes to AI via the input box on the left.</p> // TODO: use placeholder font
+            ) : (
+              <div className="overflow-x-auto">
+                <Table hoverable>
+                  <TableHead>
+                    <TableRow>
+                      <TableHeadCell>Project</TableHeadCell>
+                      <TableHeadCell>Task</TableHeadCell>
+                      <TableHeadCell>Owner</TableHeadCell>
+                      <TableHeadCell>Start Date</TableHeadCell>
+                      <TableHeadCell>Due Date</TableHeadCell>
+                      <TableHeadCell>Status</TableHeadCell>
+                      <TableHeadCell>Dependency</TableHeadCell>
+                      <TableHeadCell>Percent Complete</TableHeadCell>
+                      <TableHeadCell>Priority</TableHeadCell> 
+                      <TableHeadCell>Action Type</TableHeadCell>
+                      <TableHeadCell>Confidence</TableHeadCell>
+                      <TableHeadCell className="p-4">
+                        <Checkbox 
+                          checked={selectedIds.size === drafts.length && drafts.length > 0}
+                          onChange={toggleSelectAll}
+                        />
+                      </TableHeadCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody className='divide-y'>
+                    {drafts.map((task) => (
+                      <TableRow key={task.task_id} className="bg-white dark:border-gray-700 dark:bg-gray-800">
+                        <TableCell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
+                          {task.project_id || '—'}
+                        </TableCell>
+                        <TableCell>{task.task_title}</TableCell>
+                        <TableCell>{task.owner_name || '—'}</TableCell>
+                        <TableCell>{task.planned_start || task.start_date_raw || '—'}</TableCell>
+                        <TableCell>{task.planned_due || task.due_date_raw || '—'}</TableCell>
+                        <TableCell>{task.status}</TableCell>
+                        <TableCell>{task.dependency || '—'}</TableCell>
+                        <TableCell>{task.percent_complete != null ? `${task.percent_complete}%` : '—'}</TableCell>
+                        <TableCell>{task.priority || '—'}</TableCell>
+                        <TableCell>{task.action_type?.replace(/_/g, ' ')}</TableCell>
+                        <TableCell>
+                           <span className={`confidence-badge confidence-${task.confidence?.toLowerCase()}`}>
+                             {task.confidence}
+                           </span>
+                        </TableCell>
+                        <TableCell className="p-4">
+                          <Checkbox 
+                            checked={selectedIds.has(task.task_id)}
+                            onChange={() => toggleDraftSelection(task.task_id)}
+                          />
+                        </TableCell>  
+                      </TableRow>
+                      ))}               
+                  </TableBody>
+                </Table>
+              </div>
+            )
+          }
           </div>
           <ApproveButton
             onClick={handleCommit}

@@ -6,7 +6,8 @@
 
 .panel-layout {
   display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(400px, 2fr);
+  grid-template-rows: minmax(320px, 1fr) minmax(400px, 2fr);
+  /* properly cascade the effects of above change */
   gap: 24px;
   margin: 24px 24px 24px 24px;
   min-height: 320px;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { Button, Card, Badge, Dropdown, DropdownItem, Spinner } from 'flowbite-react';
+import { Button, Card, Badge, Dropdown, DropdownItem, Spinner, Progress } from 'flowbite-react';
 import date_utils from './utils/date_utils';
 import { DEFAULT_VIEW_MODES, DEFAULT_OPTIONS } from './utils/gantt_config';
 import './GanttChart.css';
@@ -120,7 +120,7 @@ function Gantt() {
   }
 
   return (
-    <Card className="gantt-card">
+    <Card className="gantt-card w-full b-0">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Dropdown label={`View: ${viewMode}`} inline={true}>
@@ -136,35 +136,52 @@ function Gantt() {
         </div>
       </div>
 
-      <div className="gantt-container" ref={containerRef} style={{ height: 420 }}>
+      <div className="gantt-container h-100 overflow-auto" ref={containerRef}>
         {layout ? (
           <div style={{ position: 'relative', minWidth: layout.width }}>
             <svg className="gantt-svg" width={layout.width} height={layout.rowHeight * tasks.length + DEFAULT_OPTIONS.upper_header_height + 40}>
               {/* grid rows */}
-              <rect className="grid-background" x={0} y={0} width={layout.width} height={layout.rowHeight * tasks.length + DEFAULT_OPTIONS.upper_header_height + 40} />
+              <rect className="grid-background fill-white" x={0} y={0} width={layout.width} height={layout.rowHeight * tasks.length + DEFAULT_OPTIONS.upper_header_height + 40} />
               {layout.days.map((d, i) => (
-                <g key={i}>
+                  <g key={i}>
                   <text x={i * layout.columnWidth + 4} y={14} className="grid-header">{date_utils.format(d, 'YYYY-MM-DD')}</text>
-                </g>
+                  </g>
               ))}
 
               {/* bars */}
               {layout.bars.map((b) => (
                 <g key={b.task_id}>
-                  <rect
-                    x={b.x}
-                    y={b.y}
-                    width={b.w}
+                  <foreignObject 
+                    x={b.x} 
+                    y={b.y} 
+                    width={b.w} 
                     height={DEFAULT_OPTIONS.bar_height}
-                    rx={6}
-                    className="bar-rect"
-                    fill={b.priority === 'High' ? '#dc2626' : b.priority === 'Medium' ? '#f59e0b' : '#2563eb'}
-                  />
+                  >
+                    <div className="w-full h-full flex flex-col justify-center">
+                      <Progress className='size-xl'
+                        progress={b.percent_complete || 0} 
+                        size="xl"
+                        color="black"
+                        className={
+                          b.priority === 'High' ? 'bg-sjred' : 
+                          b.priority === 'Medium' ? 'bg-sjblue' : 
+                          'bg-black/50'
+                        }
+                      />
+                    </div>
+                  </foreignObject>
+                  
                   {/* label on bar */}
-                  <text x={b.x + 8} y={b.y + DEFAULT_OPTIONS.bar_height - 4} className="bar-label">{b.task_title}</text>
+                  <text 
+                    x={b.x + 12} 
+                    y={b.y + DEFAULT_OPTIONS.bar_height - 6} 
+                    className="font-sans text-lg md:text-xl font-medium pointer-events-none"
+                    fill="#ffffff" /* Added fill to ensure it contrasts over the progress bar */
+                  >
+                    {b.task_title}
+                  </text>
                 </g>
               ))}
-
               {/* arrows: simple straight lines from end of predecessor to start of successor */}
               {layout.bars.map((b) =>
                 (b.dependencies || []).map((predId) => {
@@ -174,7 +191,7 @@ function Gantt() {
                   const y1 = pred.y + DEFAULT_OPTIONS.bar_height / 2;
                   const x2 = b.x;
                   const y2 = b.y + DEFAULT_OPTIONS.bar_height / 2;
-                  return <line key={`${predId}-${b.task_id}`} x1={x1} y1={y1} x2={x2} y2={y2} className="arrow-line" />;
+                  return <line key={`${predId}-${b.task_id}`} x1={x1} y1={y1} x2={x2} y2={y2} className="arrow-line stroke-black stroke-2" />;
                 }),
               )}
             </svg>
@@ -183,7 +200,7 @@ function Gantt() {
             {layout.bars.map((b) => (
               <div
                 key={b.task_id}
-                className="bar-hover-overlay"
+                className="bar-hover-overlay absolute cursor-pointer"
                 style={{ left: b.x, top: b.y, width: b.w, height: DEFAULT_OPTIONS.bar_height }}
                 onMouseEnter={(event) => showHoveredTask(b, event)}
                 onMouseLeave={() => {
@@ -194,7 +211,7 @@ function Gantt() {
             ))}
 
             {hovered && tooltipPos && (
-              <div style={{ position: 'absolute', left: tooltipPos.left, top: tooltipPos.top, width: tooltipWidth }} className="gantt-tooltip-card">
+              <div style={{ position: 'absolute', left: tooltipPos.left, top: tooltipPos.top, width: tooltipWidth }} className="gantt-tooltip-card pointer-events-none">
                 <Card className="w-full">
                   <div className="text-sm font-semibold">{hovered.task_title}</div>
                   <div className="text-xs">{hovered.owner_name || '—'}</div>

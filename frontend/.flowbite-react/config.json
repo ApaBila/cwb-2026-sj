@@ -13,7 +13,8 @@
      "NavbarCollapse", 
      "NavbarLink", 
      "NavbarToggle",
-     "Spinner"
+     "Spinner",
+     "Progress"
   ],
   "dark": false,
   "path": "src/components",

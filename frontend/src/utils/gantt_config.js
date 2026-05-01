@@ -7,7 +7,7 @@ export const DEFAULT_VIEW_MODES = [
 export const DEFAULT_OPTIONS = {
   view_mode: 'Day',
   column_width: null,
-  bar_height: 18,
+  bar_height: 24,
   padding: 8,
   lower_header_height: 22,
   upper_header_height: 28,

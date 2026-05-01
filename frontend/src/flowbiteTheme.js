@@ -20,4 +20,11 @@ export const brandFlowbiteTheme = createTheme({
   checkbox: {
     base: 'h-8 w-8 rounded'
   },
+  progress: {
+    color: {
+      black: 'bg-black',
+      sjred: 'bg-sjred',
+      sjblue: 'bg-sjblue'
+    }
+  },
 })

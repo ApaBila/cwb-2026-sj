@@ -12,7 +12,8 @@
      "NavbarBrand", 
      "NavbarCollapse", 
      "NavbarLink", 
-     "NavbarToggle"
+     "NavbarToggle",
+     "Spinner"
   ],
   "dark": false,
   "path": "src/components",

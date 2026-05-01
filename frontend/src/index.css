@@ -16,7 +16,7 @@
 @layer base {
   /* Headings: 24px mobile (text-2xl), 30px desktop (md:text-3xl) */
   h1, h2, h3 {
-    @apply font-sans text-xl md:text-2xl;
+    @apply font-sans text-2xl md:text-3xl;
   }
 
   /* Body text: ~18px mobile (text-lg), 20px desktop (md:text-xl) */

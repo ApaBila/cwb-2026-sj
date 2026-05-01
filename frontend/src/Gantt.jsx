@@ -127,11 +127,11 @@ function Gantt() {
               <DropdownItem key={m.name} onClick={() => setViewMode(m.name)}>{m.name}</DropdownItem>
             ))}
           </Dropdown>
-          <Button size="sm" onClick={() => fetchTasks()}>Refresh</Button>
-          <Button size="sm" outline onClick={() => containerRef.current?.scrollTo({ left: 0, behavior: 'smooth' })}>Today</Button>
+          <Button pill size="xl" onClick={() => fetchTasks()}>Refresh</Button>
+          <Button pill size="xl" outline onClick={() => containerRef.current?.scrollTo({ left: 0, behavior: 'smooth' })}>Beginning</Button>
         </div>
         <div>
-          <Badge color="info">{tasks.length} tasks</Badge>
+          <Badge color='black'>{tasks.length} tasks</Badge>
         </div>
       </div>
 
@@ -147,7 +147,7 @@ function Gantt() {
                 else if (viewMode === 'Week') formatStr = 'MMM DD';
                 return (
                   <g key={i}>
-                    <text x={i * layout.columnWidth + 4} y={14} className="grid-header text-xs">{date_utils.format(d, formatStr)}</text>
+                    <text x={i * layout.columnWidth + 4} y={14} className="grid-header font-sans text-sm md:text-base">{date_utils.format(d, formatStr)}</text>
                   </g>
                 );
               })}
@@ -195,7 +195,7 @@ function Gantt() {
                   const y1 = pred.y + DEFAULT_OPTIONS.bar_height / 2;
                   const x2 = b.x;
                   const y2 = b.y + DEFAULT_OPTIONS.bar_height / 2;
-                  return <line key={`${predId}-${b.task_id}`} x1={x1} y1={y1} x2={x2} y2={y2} className="arrow-line stroke-black stroke-2" />;
+                  return <line key={`${predId}-${b.task_id}`} x1={x1} y1={y1} x2={x2} y2={y2} className="line stroke-black stroke-2" />;
                 }),
               )}
             </svg>
@@ -217,9 +217,9 @@ function Gantt() {
             {hovered && tooltipPos && (
               <div style={{ position: 'absolute', left: tooltipPos.left, top: tooltipPos.top, width: tooltipWidth }} className="gantt-tooltip-card pointer-events-none">
                 <Card className="w-full">
-                  <div className="text-sm font-semibold">{hovered.task_title}</div>
-                  <div className="text-xs">{hovered.owner_name || '—'}</div>
-                  <div className="text-xs">{date_utils.format(hovered.planned_start)} → {date_utils.format(hovered.planned_due)}</div>
+                  <div className="font-sans text-lg md:text-xl font-semibold">{hovered.task_title}</div>
+                  <div className="font-sans text-base md:text-lg">{hovered.owner_name || '—'}</div>
+                  <div className="font-sans text-base md:text-lg">{date_utils.format(hovered.planned_start)} → {date_utils.format(hovered.planned_due)}</div>
                 </Card>
               </div>
             )}

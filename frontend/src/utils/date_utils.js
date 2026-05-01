@@ -46,9 +46,26 @@ function format(date, fmt = 'YYYY-MM-DD') {
   if (!date) return '';
   const d = new Date(date);
   const y = d.getFullYear();
+  const yy = String(y).slice(-2);
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
+  
   if (fmt === 'YYYY-MM-DD') return `${y}-${m}-${day}`;
+  if (fmt === 'MM/DD') return `${m}/${day}`;
+  if (fmt === 'YY/MM') return `${yy}/${m}`;
+  if (fmt === 'MM-DD') return `${m}-${day}`;
+  if (fmt === 'MMM DD') {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${monthNames[d.getMonth()]} ${d.getDate()}`;
+  }
+  if (fmt === 'MMM D') {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${monthNames[d.getMonth()]} ${d.getDate()}`;
+  }
+  if (fmt === 'MMM YYYY') {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${monthNames[d.getMonth()]} ${y}`;
+  }
   return `${y}-${m}-${day}`;
 }
 

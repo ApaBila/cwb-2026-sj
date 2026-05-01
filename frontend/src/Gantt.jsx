@@ -2,7 +2,6 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { Button, Card, Badge, Dropdown, DropdownItem, Spinner, Progress } from 'flowbite-react';
 import date_utils from './utils/date_utils';
 import { DEFAULT_VIEW_MODES, DEFAULT_OPTIONS } from './utils/gantt_config';
-import './GanttChart.css';
 
 function Gantt() {
   const [tasks, setTasks] = useState([]);
@@ -122,7 +121,7 @@ function Gantt() {
   return (
     <Card className="gantt-card w-full b-0">
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 relative z-50">
           <Dropdown label={`View: ${viewMode}`} inline={true}>
             {DEFAULT_VIEW_MODES.map((m) => (
               <DropdownItem key={m.name} onClick={() => setViewMode(m.name)}>{m.name}</DropdownItem>
@@ -136,17 +135,22 @@ function Gantt() {
         </div>
       </div>
 
-      <div className="gantt-container h-100 overflow-auto" ref={containerRef}>
+      <div className="gantt-container h-100 overflow-auto relative z-0" ref={containerRef}>
         {layout ? (
-          <div style={{ position: 'relative', minWidth: layout.width }}>
+          <div style={{ position: 'relative', minWidth: layout.width, zIndex: 0 }}>
             <svg className="gantt-svg" width={layout.width} height={layout.rowHeight * tasks.length + DEFAULT_OPTIONS.upper_header_height + 40}>
               {/* grid rows */}
               <rect className="grid-background fill-white" x={0} y={0} width={layout.width} height={layout.rowHeight * tasks.length + DEFAULT_OPTIONS.upper_header_height + 40} />
-              {layout.days.map((d, i) => (
+              {layout.days.map((d, i) => {
+                let formatStr = 'MM/DD';
+                if (viewMode === 'Month') formatStr = 'YY/MM';
+                else if (viewMode === 'Week') formatStr = 'MMM DD';
+                return (
                   <g key={i}>
-                  <text x={i * layout.columnWidth + 4} y={14} className="grid-header">{date_utils.format(d, 'YYYY-MM-DD')}</text>
+                    <text x={i * layout.columnWidth + 4} y={14} className="grid-header text-xs">{date_utils.format(d, formatStr)}</text>
                   </g>
-              ))}
+                );
+              })}
 
               {/* bars */}
               {layout.bars.map((b) => (

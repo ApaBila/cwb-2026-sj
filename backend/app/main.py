@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Body, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from .services.update_formatter import format_update
 from .schemas import UpdateRequest
@@ -7,7 +7,8 @@ from .database import SessionLocal
 from .services.change_detector import detect_changes_batched
 from sqlalchemy import text
 from .schemas import CommitUpdate
-from .models import Task
+from .models import Task, Dependency
+from datetime import date
 
 app = FastAPI(title="SJ Project Planner API")
 app.add_middleware(
@@ -16,6 +17,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# API struct
+# update
+# (POST to send to AI then add formatted version to database as a draft)
+# (PATCH to approve and move from draft to tasks)
+# - drafts: unapproved updates
+#   (GET to view for approval)
+# - tasks: approved tasks for Gantt chart
+#   (GET to view for Gantt chart)
+# All of these are actually Task objects, only Gantt uses Dependency
 
 
 @app.get("/")
@@ -26,12 +37,14 @@ def health_status():
             db.execute(text("SELECT 1"))  # type: ignore
         except Exception as e:
             raise HTTPException(
-                status_code=500, detail=f"Database connection failed: {str(e)}")
+                status_code=500, detail=f"""Database connection failed: {str(e)}.
+                Try checking database networking settings.""")
     return {"status": "online", "message": "SJ Planner Backend is running"}
 
 
-@app.post("/api/project-update")
-async def project_update(request_text: UpdateRequest):
+# TODO: separate into POST for new, (?) for conflict?, and PATCH for update
+@app.post("/api/updates")
+async def post_updates(request_text: UpdateRequest):
     user_text = request_text.user_text
 
     try:
@@ -57,8 +70,8 @@ async def get_drafts():
     return [dict(result) for result in results]
 
 
-@app.put("/api/commit")
-async def commit_updates(request_text: CommitUpdate):
+@app.patch("/api/updates")
+async def patch_updates(request_text: CommitUpdate):
     task_ids = [str(task_id).strip()
                 for task_id in request_text.task_ids if str(task_id).strip()]
     with SessionLocal() as db:
@@ -82,3 +95,31 @@ async def commit_updates(request_text: CommitUpdate):
             db.rollback()
             raise HTTPException(
                 status_code=500, detail=f"Error committing tasks: {str(e)}")
+
+
+@app.get("/api/tasks")
+def get_tasks():
+    with SessionLocal() as db:
+        try:
+            # get all approved updates aka tasks
+            tasks = db.query(Task).filter(Task.is_approved == True).all()
+            # get their dependencies
+            deps = db.query(Dependency).filter(
+                Dependency.successor_task_id.in_([t.task_id for t in tasks])).all()
+            predecessor_map = {}
+            for d in deps:
+                predecessor_map.setdefault(d.successor_task_id, []).append(
+                    d.predecessor_task_id
+                )
+            out = []
+            for t in tasks:
+                task_data = {}
+                for col in t.__table__.columns:
+                    val = getattr(t, col.name)
+                    task_data[col.name] = val.isoformat(
+                    ) if isinstance(val, date) else val
+                task_data["dependencies"] = predecessor_map.get(t.task_id, [])
+                out.append(task_data)
+            return out
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))

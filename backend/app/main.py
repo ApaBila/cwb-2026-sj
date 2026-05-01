@@ -24,7 +24,7 @@ app.add_middleware(
 # (PATCH to approve and move from draft to tasks)
 # - drafts: unapproved updates
 #   (GET to view for approval)
-# - tasks: approved tasks for Gantt chart
+# - tasks: approved updates for Gantt chart
 #   (GET to view for Gantt chart)
 # All of these are actually Task objects, only Gantt uses Dependency
 

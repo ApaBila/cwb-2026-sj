@@ -1,132 +1,50 @@
-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding: 24px;
-  min-width: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
+@reference "./index.css";
 
-.compose-block,
-.drafts-block {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  min-width: 0;
-}
+@layer components {
+  main {
+    @apply flex-1 flex flex-col gap-6 p-6 min-w-0 overflow-y-auto overflow-x-hidden;
+  }
+  .compose-block,
+  .drafts-block {
+    @apply flex flex-col gap-6 min-w-0;
+  }
+  .drafts-container {
+    @apply flex flex-col gap-4 min-w-0 overflow-x-auto;
+  }
 
-.message-input {
-  width: 100%;
-  min-height: 240px;
-  border: 1px solid var(--sjblue);
-  border-radius: 24px;
-  padding: 28px;
-  box-sizing: border-box;
-  font-family: var(--sans);
-  font-size: 18px;
-  color: var(--text);
-  background: var(--bg);
-  resize: none;
-  outline: none;
-}
+  .message-input {
+    @apply w-full min-h-60 border-2 border-sjblue p-6 box-border text-black bg-white resize-none outline-none focus:border-sjred;
+  }
 
-.message-input::placeholder {
-  color: var(--text);
-  opacity: 0.5;
-}
+  .no-drafts, .message-input::placeholder {
+    @apply text-black/50
+  }
 
-.message-input:focus {
-  border-color: var(--sjred);
-  outline: 2px solid var(--sjred);
-  outline-offset: 2px;
-}
+  .error,
+  .submit-error {
+    @apply m-0 text-sjred font-mono text-base md:text-lg;
+  }
 
-.blue-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 999px;
-  padding: 16px 32px;
-  background: var(--sjblue);
-  color: var(--bg);
-  font-family: var(--sans);
-  font-size: 24px;
-  font-weight: 1000;
-  line-height: 1;
-}
-
-.blue-button:hover {
-  background: var(--bg);
-  color: var(--sjred);
-  outline: 2px solid var(--sjred);
-  outline-offset: 2px;
-}
-
-.blue-button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.error,
-.submit-error {
-  margin: 0;
-  color: var(--sjred);
-  font-family: var(--sans);
-  font-size: 16px;
-}
-
-.drafts-container {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-width: 0;
-  overflow-x: auto;
-}
-
-.no-drafts {
-  margin: 0;
-  color: var(--text);
-  opacity: 0.6;
-  font-family: var(--sans);
-  font-size: 18px;
-}
-
-.confidence-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 18px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-@media (min-width: 768px) {
-  .message-input,
-  .no-drafts,
   .confidence-badge {
-    font-size: 18px;
+    @apply inline-flex items-center p-3 rounded-full text-base md:text-lg font-semibold whitespace-nowrap;
   }
 
-  .blue-button {
-    font-size: 24px;
+  .action-button {
+    @apply inline-flex items-center justify-center rounded-full py-4 px-8 
+        bg-sjblue text-white text-2xl font-[1000] leading-none
+        hover:bg-white hover:text-sjred hover:outline-2 hover:outline-offset-2 hover:outline-sjred
+        disabled:opacity-[0.55] disabled:cursor-not-allowed;
   }
-}
 
-.confidence-high {
-  background-color: color-mix(in srgb, var(--text) 18%, transparent);
-  color: var(--bg);
-}
+  .confidence-high {
+    @apply bg-black/20 text-white;
+  }
 
-.confidence-medium {
-  background-color: color-mix(in srgb, var(--sjblue) 86%, transparent);
-  color: var(--bg);
-}
+  .confidence-medium {
+    @apply bg-sjblue/80 text-white;
+  }
 
-.confidence-low {
-  background-color: color-mix(in srgb, var(--sjred) 92%, transparent);
-  color: var(--bg);
+  .confidence-low {
+    @apply bg-sjred/90 text-white;
+  }
 }

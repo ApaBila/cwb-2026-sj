@@ -39,15 +39,25 @@ Now you can use the web app locally!
 
 ```bash
 cd backend
-fastapi dev
+fastapi run
+# use `fastapi dev` for dev mode where the server updates as files change
+# see `fastapi --help` for more
 ```
+
+Even without the frontend running, you can test the API via the Swagger UI
+at `http://localhost:8000/docs`
 
 ### Run the frontend
 In a **separate** terminal:
 ```bash
 cd frontend
+## Serve locally and see changes as you make changes to the code
 npm run dev
+## before that you can use npm run build (compiles) or npm run lint (doesn't compile)
+## to check for code problems
 ```
+
+This will be served at `http://localhost:5173/`.
 
 ## Contributor Acknowledgement
 *   backend: I developed the backend's AI API and set up all Azure resources.

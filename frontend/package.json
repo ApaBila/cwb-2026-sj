@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@fontsource/metropolis": "^5.2.5",
+    "@tanstack/react-table": "^8.21.3",
     "flowbite-react": "^0.12.17",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",

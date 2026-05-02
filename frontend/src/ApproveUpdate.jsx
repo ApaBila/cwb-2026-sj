@@ -1,27 +1,12 @@
-import { useState, useEffect } from 'react'
-import { Checkbox, Table, TableBody, TableCell, TableHead, TableHeadCell, TableRow, Spinner} from "flowbite-react";
+import { useState, useEffect, useCallback } from 'react'
+import { Spinner, Button } from 'flowbite-react'
+import DraftsDataTable from './DraftsDataTable'
 
-function SubmitButton({ onClick, disabled, loading }) {
-  return (
-    <button className="action-button" type="button" onClick={onClick} disabled={disabled}>
-      {loading ? 'Submitting...' : <>Submit <span aria-hidden="true">→</span></>}
-    </button>
-  );
-}
-
-function ApproveButton({ onClick, disabled, loading, selectedCount }) {
-  return (
-    <button className="action-button" type="button" onClick={onClick} disabled={disabled}>
-      {loading ? 'Committing...' : `Approve (${selectedCount})`}
-    </button>
-  );
-}
-
-function SubmitUpdate({ apiBaseUrl, refreshDrafts}) {
+function SubmitUpdate({ apiBaseUrl, refreshDrafts }) {
   const [message, setMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
-  
+
   async function handleSubmit() {
     if (!message.trim() || isSubmitting) {
       return
@@ -31,7 +16,7 @@ function SubmitUpdate({ apiBaseUrl, refreshDrafts}) {
     setSubmitError('')
 
     try {
-      const response = await fetch(`${apiBaseUrl}/api/updates`, {
+      const response = await fetch(`${apiBaseUrl}/api/drafts/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -68,19 +53,52 @@ function SubmitUpdate({ apiBaseUrl, refreshDrafts}) {
         onChange={(event) => setMessage(event.target.value)}
         placeholder="Type your project updates here"
       />
-      <SubmitButton
-        onClick={handleSubmit}
-        disabled={!message.trim() || isSubmitting}
-        loading={isSubmitting}
-      />
+      <div className="flex justify-end">
+        <Button
+          pill
+          type="button"
+          className="sj-action-pill"
+          disabled={!message.trim() || isSubmitting}
+          onClick={handleSubmit}
+        >
+          {isSubmitting ? (
+            'Submitting...'
+          ) : (
+            <>
+              Submit <span aria-hidden="true">→</span>
+            </>
+          )}
+        </Button>
+      </div>
       {submitError && <p className="error submit-error">{submitError}</p>}
     </section>
   )
 }
 
+function confirmRejectDrafts(selectedCount, totalDraftCount) {
+  const n = selectedCount
+  const lines = [
+    `You are about to permanently remove ${n} draft row${n === 1 ? '' : 's'} from the approval queue.`,
+    'This does not change tasks that are already on the Gantt chart.',
+    'This cannot be undone.',
+  ]
+  if (!window.confirm(lines.join('\n\n'))) {
+    return false
+  }
+  const bulk = n >= 5 || n === totalDraftCount
+  if (bulk) {
+    const second = window.confirm(
+      `Second check: That's more than 5 drafts! Do you really want to reject ${n} draft${n === 1 ? '' : 's'}?`,
+    )
+    if (!second) return false
+  }
+  return true
+}
+
 function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts }) {
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [isCommitting, setIsCommitting] = useState(false)
+  const [isRejecting, setIsRejecting] = useState(false)
   const [commitError, setCommitError] = useState('')
 
   function toggleDraftSelection(taskId) {
@@ -93,17 +111,22 @@ function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts }) {
     setSelectedIds(newSelected)
   }
 
-  function toggleSelectAll() {
-    const draftIds = drafts.map((draft) => draft.task_id).filter(Boolean)
-    if (selectedIds.size === draftIds.length && draftIds.length > 0) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(draftIds))
-    }
-  }
+  const toggleSelectAllFiltered = useCallback((ids) => {
+    if (!ids.length) return
+    const allSelected = ids.every((id) => selectedIds.has(id))
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (allSelected) {
+        ids.forEach((id) => next.delete(id))
+      } else {
+        ids.forEach((id) => next.add(id))
+      }
+      return next
+    })
+  }, [selectedIds])
 
   async function handleCommit() {
-    if (selectedIds.size === 0 || isCommitting) {
+    if (selectedIds.size === 0 || isCommitting || isRejecting) {
       return
     }
 
@@ -111,7 +134,7 @@ function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts }) {
     setCommitError('')
 
     try {
-      const response = await fetch(`${apiBaseUrl}/api/updates`, {
+      const response = await fetch(`${apiBaseUrl}/api/drafts/approve`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -137,86 +160,98 @@ function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts }) {
     }
   }
 
+  async function handleReject() {
+    if (selectedIds.size === 0 || isRejecting || isCommitting) {
+      return
+    }
+    if (!confirmRejectDrafts(selectedIds.size, drafts.length)) {
+      return
+    }
+
+    setIsRejecting(true)
+    setCommitError('')
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/drafts/reject`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          task_ids: Array.from(selectedIds),
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        let errorMessage = 'Reject failed. Please try again.'
+        const d = data?.detail
+        if (typeof d === 'string') {
+          errorMessage = d
+        } else if (Array.isArray(d)) {
+          errorMessage = d.map((e) => e?.msg || JSON.stringify(e)).join(' ')
+        }
+        throw new Error(errorMessage)
+      }
+
+      setSelectedIds(new Set())
+      await refreshDrafts()
+    } catch (error) {
+      setCommitError(error.message || 'Reject failed. Please try again.')
+    } finally {
+      setIsRejecting(false)
+    }
+  }
+
+  const busy = isCommitting || isRejecting
+
   return (
     <section className="drafts-block" aria-label="Approval workspace">
       <div className="drafts-container">
         {drafts.length === 0 ? (
           <p className="no-drafts">No drafts to approve. Try submitting project updates to AI via the input box above.</p>
         ) : (
-          <>
-            <Table hoverable className="shadow-none">
-              <TableHead>
-                <TableRow>
-                  <TableHeadCell>Project</TableHeadCell>
-                  <TableHeadCell>Task</TableHeadCell>
-                  <TableHeadCell>Owner</TableHeadCell>
-                  <TableHeadCell>Start Date</TableHeadCell>
-                  <TableHeadCell>Due Date</TableHeadCell>
-                  <TableHeadCell>Status</TableHeadCell>
-                  <TableHeadCell>Dependency</TableHeadCell>
-                  <TableHeadCell>Percent Complete</TableHeadCell>
-                  <TableHeadCell>Priority</TableHeadCell>
-                  <TableHeadCell>Action Type</TableHeadCell>
-                  <TableHeadCell>Confidence</TableHeadCell>
-                  <TableHeadCell>
-                    <Checkbox
-                      checked={selectedIds.size === drafts.length && drafts.length > 0}
-                      onChange={toggleSelectAll}
-                    />
-                  </TableHeadCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {drafts.map((task) => (
-                  <TableRow key={task.task_id}>
-                    <TableCell>
-                      {task.project_id || '—'}
-                    </TableCell>
-                    <TableCell>{task.task_title}</TableCell>
-                    <TableCell>{task.owner_name || '—'}</TableCell>
-                    <TableCell>{task.planned_start || task.start_date_raw || '—'}</TableCell>
-                    <TableCell>{task.planned_due || task.due_date_raw || '—'}</TableCell>
-                    <TableCell>{task.status}</TableCell>
-                    <TableCell>{task.dependency || '—'}</TableCell>
-                    <TableCell>{task.percent_complete != null ? `${task.percent_complete}%` : '—'}</TableCell>
-                    <TableCell>{task.priority || '—'}</TableCell>
-                    <TableCell>{task.action_type?.replace(/_/g, ' ')}</TableCell>
-                    <TableCell>
-                      <span className={`confidence-badge confidence-${task.confidence?.toLowerCase()}`}>
-                        {task.confidence}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedIds.has(task.task_id)}
-                        onChange={() => toggleDraftSelection(task.task_id)}
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </>
+          <DraftsDataTable
+            drafts={drafts}
+            selectedIds={selectedIds}
+            onToggle={toggleDraftSelection}
+            onToggleAllFiltered={toggleSelectAllFiltered}
+          />
         )}
       </div>
-      <ApproveButton
-        onClick={handleCommit}
-        disabled={selectedIds.size === 0 || isCommitting}
-        loading={isCommitting}
-        selectedCount={selectedIds.size}
-      />
+      <div className="flex flex-wrap justify-end gap-4">
+        <Button
+          pill
+          type="button"
+          className="sj-action-pill"
+          disabled={selectedIds.size === 0 || busy}
+          onClick={handleCommit}
+        >
+          {isCommitting ? 'Committing...' : `Approve (${selectedIds.size})`}
+        </Button>
+        <Button
+          pill
+          type="button"
+          className="sj-action-pill--reject"
+          disabled={selectedIds.size === 0 || busy}
+          onClick={handleReject}
+        >
+          {isRejecting ? 'Removing…' : `Reject (${selectedIds.size})`}
+        </Button>
+      </div>
       {commitError && <p className="error submit-error">{commitError}</p>}
     </section>
-  );
+  )
 }
 
 export default function ProjectUpdateManager() {
   const [drafts, setDrafts] = useState([])
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true)
   const apiBaseUrl = import.meta.env.DEV ? 'http://localhost:8000' : ''
 
   async function fetchDrafts() {
-    setLoading(true);
+    setLoading(true)
     try {
       const response = await fetch(`${apiBaseUrl}/api/drafts`)
       if (!response.ok) throw new Error('Failed to fetch drafts')
@@ -225,23 +260,26 @@ export default function ProjectUpdateManager() {
     } catch (error) {
       console.error('Error fetching drafts:', error)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchDrafts()
+    const t = setTimeout(() => {
+      void fetchDrafts()
+    }, 0)
+    return () => clearTimeout(t)
   }, [])
-  
+
   if (loading) {
     return (
       <main>
         <SubmitUpdate apiBaseUrl={apiBaseUrl} refreshDrafts={fetchDrafts} />
         <div className="flex items-center justify-center p-6">
-          <Spinner className="w-12 h-12 md:w-16 md:h-16" />
+          <Spinner className="h-12 w-12 md:h-16 md:w-16" />
         </div>
       </main>
-    );
+    )
   }
 
   return (

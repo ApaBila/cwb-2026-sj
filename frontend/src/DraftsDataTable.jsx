@@ -264,7 +264,7 @@ export default function DraftsDataTable({
 
       <div className="overflow-x-auto border border-black/10 rounded-lg bg-white">
         <table className="w-full text-left text-black">
-          <thead className="bg-black/[0.04] text-black">
+          <thead className="bg-black/10 text-black">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
                 {hg.headers.map((header) => (
@@ -367,7 +367,7 @@ export default function DraftsDataTable({
               table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  className="border-b border-black/5 hover:bg-black/[0.02]"
+                  className="border-b border-black/5 hover:bg-black/5"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <td

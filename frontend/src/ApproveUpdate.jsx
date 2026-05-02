@@ -250,7 +250,7 @@ export default function ProjectUpdateManager() {
   const [loading, setLoading] = useState(true)
   const apiBaseUrl = import.meta.env.DEV ? 'http://localhost:8000' : ''
 
-  async function fetchDrafts() {
+  const fetchDrafts = useCallback(async () => {
     setLoading(true)
     try {
       const response = await fetch(`${apiBaseUrl}/api/drafts`)
@@ -262,14 +262,14 @@ export default function ProjectUpdateManager() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [apiBaseUrl])
 
   useEffect(() => {
     const t = setTimeout(() => {
       void fetchDrafts()
     }, 0)
     return () => clearTimeout(t)
-  }, [])
+  }, [fetchDrafts])
 
   if (loading) {
     return (

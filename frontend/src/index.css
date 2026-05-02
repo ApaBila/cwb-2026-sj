@@ -10,18 +10,35 @@
   --color-sjblue: #1257FD;
   --color-sjred: #ED2024;
   --font-sans: Metropolis, Montserrat, system-ui, sans-serif;
-  --font-mono: ui-monospace, Consolas, monospace
+  --font-mono: ui-monospace, Consolas, monospace;
+
+  /**
+   * sj-body: tables + Gantt grid copy. sj-control: pill / chrome (matches Flowbite buttons).
+   * Tailwind v4 generates `text-sj-body` / `text-sj-control` from these tokens.
+   */
+  --text-sj-body: clamp(0.6875rem, 0.14vw + 0.64rem, 0.8125rem);
+  --text-sj-body--line-height: 1.4;
+  --text-sj-control: clamp(0.625rem, 0.32vw + 0.48rem, 0.875rem);
+  --text-sj-control--line-height: 1.2;
+}
+
+@layer components {
+  .sj-text-h2 {
+    @apply font-sans font-semibold text-sj-control leading-tight;
+  }
 }
 
 @layer base {
-  /* Headings: 24px mobile (text-2xl), 30px desktop (md:text-3xl) */
-  h1, h2, h3 {
-    @apply font-sans text-2xl md:text-3xl;
+  /* Document headings (navbar brand / nav links keep their own classes). */
+  h1 {
+    @apply font-sans text-xl md:text-2xl;
   }
 
-  /* Body text: ~18px mobile (text-lg), 20px desktop (md:text-xl) */
   body {
-    @apply font-sans text-lg md:text-xl;
+    margin: 0;
+    min-height: 100svh;
+    letter-spacing: 0.18px;
+    @apply bg-white font-sans text-sj-body text-black;
   }
 
 }
@@ -35,16 +52,10 @@
   color-scheme: light;
 }
 
-body {
-  margin: 0;
-  min-height: 100svh;
-  letter-spacing: 0.18px;
-  @apply bg-white text-black;
-}
-
 #root {
   width: 100%;
   min-height: 100svh;
+  min-height: 100dvh;
   margin: 0 auto;
   display: flex;
   flex-direction: column;

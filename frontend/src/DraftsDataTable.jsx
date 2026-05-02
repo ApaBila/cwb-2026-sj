@@ -162,9 +162,7 @@ const columns = [
     cell: (info) => {
       const c = String(info.getValue() ?? '').toLowerCase();
       return (
-        <span
-          className={`confidence-badge confidence-${c} font-sans text-lg md:text-xl`}
-        >
+        <span className={`confidence-badge confidence-${c}`}>
           {info.getValue()}
         </span>
       );
@@ -175,7 +173,7 @@ const columns = [
   {
     id: '_select',
     header: () => (
-      <span className="flex w-full flex-col items-center justify-center font-sans text-lg font-semibold leading-tight text-black md:text-xl">
+      <span className="flex w-full flex-col items-center justify-center font-sans text-sj-body font-semibold leading-tight text-black">
         Select All
       </span>
     ),
@@ -196,6 +194,30 @@ const columns = [
     },
   },
 ];
+
+/**
+ * Fixed layout width (px) so headers/filters never collapse when the viewport
+ * narrows — the outer wrapper scrolls horizontally instead. Sum of col widths.
+ */
+const DRAFTS_TABLE_MIN_WIDTH_PX = 1180;
+
+/** `table-layout: fixed` column widths (px). Order matches `columns`. */
+const DRAFTS_COLGROUP = (
+  <colgroup>
+    <col style={{ width: 88 }} />
+    <col style={{ width: 160 }} />
+    <col style={{ width: 84 }} />
+    <col style={{ width: 96 }} />
+    <col style={{ width: 96 }} />
+    <col style={{ width: 88 }} />
+    <col style={{ width: 104 }} />
+    <col style={{ width: 52 }} />
+    <col style={{ width: 84 }} />
+    <col style={{ width: 136 }} />
+    <col style={{ width: 120 }} />
+    <col style={{ width: 72 }} />
+  </colgroup>
+);
 
 /**
  * @param {{
@@ -238,9 +260,9 @@ export default function DraftsDataTable({
   const headerGroup = table.getHeaderGroups()[0];
 
   return (
-    <div className="drafts-table-wrap flex flex-col gap-4 min-w-0">
-      <div className="flex flex-wrap items-baseline gap-4">
-        <p className="font-sans text-lg md:text-xl text-black">
+    <div className="drafts-table-wrap flex min-h-0 min-w-0 flex-1 flex-col gap-2">
+      <div className="flex shrink-0 flex-wrap items-baseline gap-3">
+        <p className="sj-text-h2 text-black">
           Showing{' '}
           <strong className="font-semibold text-black">
             {table.getFilteredRowModel().rows.length}
@@ -254,7 +276,7 @@ export default function DraftsDataTable({
         {hasFilters && (
           <button
             type="button"
-            className="font-sans text-lg md:text-xl font-semibold text-sjblue underline underline-offset-4 decoration-2 hover:text-sjred"
+            className="font-sans font-semibold text-sj-control leading-tight text-sjblue underline decoration-2 underline-offset-4 hover:text-sjred"
             onClick={clearFilters}
           >
             Clear column filters
@@ -262,23 +284,27 @@ export default function DraftsDataTable({
         )}
       </div>
 
-      <div className="overflow-x-auto border border-black/10 rounded-lg bg-white">
-        <table className="w-full text-left text-black">
+      <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-x-contain border border-black/10 bg-white">
+        <table
+          className="table-fixed w-full text-left text-black"
+          style={{ minWidth: DRAFTS_TABLE_MIN_WIDTH_PX }}
+        >
+          {DRAFTS_COLGROUP}
           <thead className="bg-black/10 text-black">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
                 {hg.headers.map((header) => (
                   <th
                     key={header.id}
-                    className={`px-3 py-3 font-sans text-lg md:text-xl font-semibold whitespace-nowrap border-b border-black/10 ${header.column.id === '_select' ? 'align-middle text-center' : 'align-bottom text-left'}`}
+                    className={`px-2 py-2 font-sans text-sj-body font-semibold whitespace-nowrap border-b border-black/10 ${header.column.id === '_select' ? 'align-middle text-center' : 'align-bottom text-left overflow-hidden'}`}
                   >
                     {header.column.getCanSort() ? (
                       <button
                         type="button"
-                        className="flex items-center gap-2 font-sans text-lg md:text-xl font-semibold text-black hover:text-sjred text-left w-full"
+                        className="flex w-full min-w-0 items-center gap-2 overflow-hidden text-left font-sans text-sj-body font-semibold text-black hover:text-sjred"
                         onClick={header.column.getToggleSortingHandler()}
                       >
-                        <span>
+                        <span className="min-w-0 truncate">
                           {flexRender(
                             header.column.columnDef.header,
                             header.getContext(),
@@ -324,10 +350,10 @@ export default function DraftsDataTable({
                 return (
                   <th
                     key={`f-${header.id}`}
-                    className={`px-3 pb-3 pt-1 border-b border-black/10 ${header.column.id === '_select' ? 'align-middle text-center' : 'align-top text-left'}`}
+                    className={`px-2 pb-2 pt-1 border-b border-black/10 ${header.column.id === '_select' ? 'align-middle text-center' : 'align-top text-left'}`}
                   >
                     {header.column.id === '_select' ? (
-                      <div className="flex items-center justify-center py-1">
+                      <div className="flex items-center justify-center py-0.5">
                         <Checkbox
                           aria-label="Select all visible drafts"
                           checked={allSelected}
@@ -345,7 +371,7 @@ export default function DraftsDataTable({
                             e.target.value || undefined,
                           )
                         }
-                        className="w-full min-w-[10rem] max-w-[18rem] box-border rounded border-2 border-black/20 bg-white px-2 py-1 font-sans text-lg md:text-xl font-semibold text-black placeholder:text-black/35 placeholder:font-normal focus:border-sjblue focus:outline-none"
+                        className="box-border w-full min-w-[5.5rem] max-w-full border-2 border-black/20 bg-white px-1.5 py-0.5 font-sans text-sj-body font-semibold text-black placeholder:text-black/35 placeholder:font-normal focus:border-sjblue focus:outline-none"
                       />
                     ) : null}
                   </th>
@@ -353,12 +379,12 @@ export default function DraftsDataTable({
               })}
             </tr>
           </thead>
-          <tbody className="font-sans text-lg md:text-xl text-black">
+          <tbody className="font-sans text-sj-body text-black">
             {table.getRowModel().rows.length === 0 ? (
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-4 py-8 text-center text-black/70"
+                  className="px-3 py-6 text-center font-sans text-sj-body text-black/70"
                 >
                   No rows match the current filters.
                 </td>
@@ -372,7 +398,13 @@ export default function DraftsDataTable({
                   {row.getVisibleCells().map((cell) => (
                     <td
                       key={cell.id}
-                      className={`px-3 py-3 align-middle whitespace-nowrap ${cell.column.id === '_select' ? 'text-center' : ''}`}
+                      className={
+                        cell.column.id === '_select'
+                          ? 'px-2 py-2 text-center align-middle whitespace-nowrap'
+                          : cell.column.id === 'confidence'
+                            ? 'px-2 py-2 align-middle whitespace-nowrap'
+                            : 'max-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-2 py-2 align-middle'
+                      }
                     >
                       {flexRender(
                         cell.column.columnDef.cell,

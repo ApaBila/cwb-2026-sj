@@ -11,31 +11,35 @@ import Gantt from './Gantt';
 function App() {
   return (
     <BrowserRouter>
-      <Navbar fluid rounded>
+      <div className="flex min-h-dvh w-full min-w-0 flex-col">
+      <Navbar fluid className="shrink-0 rounded-none bg-white shadow-none">
         <NavbarBrand>
-          <div className="block text-sjblue text-2xl font-semibold leading-none md:text-3xl">
+          <div className="block text-sjblue font-bold leading-none">
             <h1> SJ Project Manager </h1>
           </div>
-          <div className="block ml-10 text-sjblue text-lg font-normal leading-tight md:text-xl">
+          <div className="block ml-5 text-sjblue text-base font-bold leading-tight">
             Real impact, <br /> made together 
           </div>
         </NavbarBrand>    
         <NavbarToggle />
         <NavbarCollapse>
-          <NavbarLink as={Link} to="/" className="text-2xl font-semibold md:text-3xl">
+          <NavbarLink as={Link} to="/" className="font-semibold">
             <h1> Update </h1>
           </NavbarLink>
-          <NavbarLink as={Link} to="/Gantt" className="text-2xl font-semibold md:text-3xl">
+          <NavbarLink as={Link} to="/Gantt" className="font-semibold">
             <h1> View </h1>
           </NavbarLink>
         </NavbarCollapse>
 
       </Navbar>
 
-      <Routes>
-        <Route path="/" element={<ApproveUpdate />} />
-        <Route path="/Gantt" element={<Gantt />} />
-      </Routes>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <Routes>
+          <Route path="/" element={<ApproveUpdate />} />
+          <Route path="/Gantt" element={<Gantt />} />
+        </Routes>
+      </div>
+      </div>
     </BrowserRouter>
   );
 }

@@ -220,27 +220,33 @@ function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts }) {
           />
         )}
       </div>
-      <div className="flex flex-wrap justify-end gap-4">
-        <Button
-          pill
-          type="button"
-          className="sj-action-pill"
-          disabled={selectedIds.size === 0 || busy}
-          onClick={handleCommit}
-        >
-          {isCommitting ? 'Committing...' : `Approve (${selectedIds.size})`}
-        </Button>
-        <Button
-          pill
-          type="button"
-          className="sj-action-pill--reject"
-          disabled={selectedIds.size === 0 || busy}
-          onClick={handleReject}
-        >
-          {isRejecting ? 'Removing...' : `Reject (${selectedIds.size})`}
-        </Button>
-      </div>
-      {commitError && <p className="error submit-error">{commitError}</p>}
+      {drafts.length > 0 ? (
+        <div className="approve-actions">
+          <div className="flex w-full flex-wrap justify-end gap-3">
+            <Button
+              pill
+              type="button"
+              className="sj-action-pill"
+              disabled={selectedIds.size === 0 || busy}
+              onClick={handleCommit}
+            >
+              {isCommitting ? 'Committing...' : `Approve (${selectedIds.size})`}
+            </Button>
+            <Button
+              pill
+              type="button"
+              className="sj-action-pill--reject"
+              disabled={selectedIds.size === 0 || busy}
+              onClick={handleReject}
+            >
+              {isRejecting ? 'Removing...' : `Reject (${selectedIds.size})`}
+            </Button>
+          </div>
+          {commitError ? <p className="error submit-error mt-2 w-full text-right">{commitError}</p> : null}
+        </div>
+      ) : commitError ? (
+        <p className="error submit-error">{commitError}</p>
+      ) : null}
     </section>
   )
 }
@@ -275,8 +281,8 @@ export default function ProjectUpdateManager() {
     return (
       <main>
         <SubmitUpdate apiBaseUrl={apiBaseUrl} refreshDrafts={fetchDrafts} />
-        <div className="flex items-center justify-center p-6">
-          <Spinner className="h-12 w-12 md:h-16 md:w-16" />
+        <div className="flex items-center justify-center p-4">
+          <Spinner className="h-10 w-10 md:h-12 md:w-12" />
         </div>
       </main>
     )

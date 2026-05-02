@@ -1,16 +1,15 @@
 import { createTheme } from 'flowbite-react'
 
 /**
- * Overrides Flowbite default Button tokens so `text-sm` / `font-medium` from
- * `size="md"` (default) do not fight `.sj-action-pill` and match `index.css`
- * heading scale (`text-2xl md:text-3xl`).
+ * Overrides Flowbite Button tokens to use `text-sj-control` from `index.css`
+ * (clamp; shrinks like pill actions) with `sj-action-pill` / navbar unchanged.
  */
 export const brandFlowbiteTheme = createTheme({
   button: {
     base: 'relative flex items-center justify-center rounded-lg text-center font-sans font-semibold focus:outline-none focus:ring-4',
     size: {
-      md: 'h-auto min-h-0 px-6 py-2 text-2xl leading-none md:text-3xl',
-      xl: 'h-auto min-h-0 px-6 py-2 text-2xl leading-none md:text-3xl',
+      md: 'h-auto min-h-0 px-4 py-1.5 text-sj-control leading-tight',
+      xl: 'h-auto min-h-0 px-4 py-1.5 text-sj-control leading-tight',
     },
   },
   // table: {
@@ -30,7 +29,7 @@ export const brandFlowbiteTheme = createTheme({
   //   },
   // },
   checkbox: {
-    base: 'h-8 w-8 rounded'
+    base: 'h-6 w-6 rounded',
   },
   progress: {
     color: {

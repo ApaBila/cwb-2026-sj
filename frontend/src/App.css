@@ -1,37 +1,55 @@
 @reference "./index.css";
 
 @layer components {
+  /**
+   * Fills space below navbar (see App.jsx shell). Inner panes own vertical scroll.
+   */
   main {
-    @apply flex-1 flex flex-col gap-6 p-6 min-w-0 overflow-y-auto overflow-x-hidden;
+    @apply flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-x-hidden bg-white p-4;
   }
-  .compose-block,
+
+  .compose-block {
+    @apply flex shrink-0 flex-col gap-3 min-w-0;
+  }
+
+  /** Holds scrollable drafts + sticky approve/reject bar. */
   .drafts-block {
-    @apply flex flex-col gap-6 min-w-0;
+    @apply flex min-h-0 min-w-0 flex-1 flex-col gap-3;
   }
+
   .drafts-container {
-    @apply flex flex-col gap-4 min-w-0 overflow-x-auto;
+    @apply flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden;
+  }
+
+  /** No border/shadow so actions read as one surface with the page; buttons unchanged. */
+  .approve-actions {
+    @apply sticky bottom-0 z-30 flex shrink-0 flex-wrap justify-end gap-3 bg-white pt-2 pb-0 outline-none;
   }
 
   .message-input {
-    @apply w-full min-h-60 border-2 border-sjblue p-6 box-border text-black bg-white resize-none outline-none focus:border-sjred;
+    @apply w-full min-h-25 border-2 border-sjblue bg-white p-4 text-black shadow-none outline-none resize-none rounded-none box-border focus:border-sjred text-sj-body;
   }
 
-  .no-drafts, .message-input::placeholder {
-    @apply text-black/50
+  .message-input::placeholder {
+    @apply text-black/50 text-sj-control font-normal;
+  }
+
+  .no-drafts {
+    @apply text-black/80 text-sj-control font-medium leading-snug;
   }
 
   .error,
   .submit-error {
-    @apply m-0 text-sjred font-mono text-base md:text-lg;
+    @apply m-0 text-sjred font-mono text-sj-body;
   }
 
   .confidence-badge {
-    @apply inline-flex items-center py-1 px-8 rounded-full text-base md:text-lg font-semibold whitespace-nowrap;
+    @apply inline-flex items-center whitespace-nowrap rounded-full px-5 py-0.5 font-sans font-semibold text-sj-body;
   }
 
 
   .sj-action-pill {
-    @apply inline-flex w-60 shrink-0 items-center justify-center gap-1 rounded-full border-0 no-underline;
+    @apply inline-flex w-60 shrink-0 items-center justify-center gap-1 rounded-full border-0 no-underline text-sj-control font-semibold;
     @apply !bg-sjblue !text-white;
     @apply hover:!bg-white hover:!text-sjred hover:outline hover:outline-2 hover:outline-offset-2 hover:outline-sjred;
     @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-sjblue;
@@ -39,7 +57,7 @@
   }
 
   .sj-action-pill--reject {
-    @apply inline-flex w-60 shrink-0 items-center justify-center gap-1 rounded-full border-0 no-underline;
+    @apply inline-flex w-60 shrink-0 items-center justify-center gap-1 rounded-full border-0 no-underline text-sj-control font-semibold;
     @apply !bg-sjred !text-white;
     @apply hover:!bg-white hover:!text-black hover:outline hover:outline-2 hover:outline-offset-2 hover:!outline-black;
     @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-black;

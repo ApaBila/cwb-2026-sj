@@ -1,4 +1,4 @@
-# SJ Project Updater
+# SJ Project Manager
 
 This project uses AI to make unstructured notes, emails, etc. into structured JSON project updates that are then used in a Gantt project tracker. Coded for [CWB 2026 Hackathon SJ Problem Statement](https://www.cwbhackathon.com/problem-statements/sj-project-planner-agent).
 
@@ -58,6 +58,8 @@ npm run dev
 ```
 
 This will be served at `http://localhost:5173/`.
+
+<!-- todo: ## Acessibility -->
 
 ## Contributor Acknowledgement
 *   backend: I developed the backend's AI API and set up all Azure resources.

@@ -5,7 +5,7 @@ from .schemas import UpdateRequest
 from openai import APIStatusError
 from .database import SessionLocal
 from .services.change_detector import detect_changes_batched
-from sqlalchemy import text
+from sqlalchemy import text, or_
 from .schemas import CommitUpdate
 from .models import Task, Dependency
 from datetime import date
@@ -19,14 +19,16 @@ app.add_middleware(
 )
 
 # API struct
-# update
-# (POST to send to AI then add formatted version to database as a draft)
-# (PATCH to approve and move from draft to tasks)
-# - drafts: unapproved updates
-#   (GET to view for approval)
-# - tasks: approved updates for Gantt chart
-#   (GET to view for Gantt chart)
-# All of these are actually Task objects, only Gantt uses Dependency
+# drafts (unapproved tasks)
+# - POST to send to AI then add formatted version to task database as a draft
+# - GET to view for approval
+# - PATCH to approve, flip is_approve flag so it'll be considered (official) tasks
+# - DELETE to reject and remove draft from tasks and dependencies
+# (official) tasks
+# - GET to view for Gantt chart
+# TODO: allow editing official tasks
+
+# drafts/(official) tasks are both Task objects
 
 
 @app.get("/")
@@ -42,9 +44,9 @@ def health_status():
     return {"status": "online", "message": "SJ Planner Backend is running"}
 
 
-# TODO: separate into POST for new, (?) for conflict?, and PATCH for update
-@app.post("/api/updates")
-async def post_updates(request_text: UpdateRequest):
+@app.post("/api/drafts/create")
+async def post_drafts(request_text: UpdateRequest):
+    # TODO: add dependency creation
     user_text = request_text.user_text
 
     try:
@@ -64,31 +66,84 @@ async def post_updates(request_text: UpdateRequest):
 
 @app.get("/api/drafts")
 async def get_drafts():
+    """Get all unapproved tasks aka drafts."""
     with SessionLocal() as db:
         results = db.execute(
             text("SELECT * FROM tasks WHERE is_approved = false")).mappings()
     return [dict(result) for result in results]
 
 
-@app.patch("/api/updates")
-async def patch_updates(request_text: CommitUpdate):
+@app.delete("/api/drafts/reject")
+async def delete_drafts(request_text: CommitUpdate):
+    """Permanently delete selected rows that are still drafts (not approved task updates)."""
     task_ids = [str(task_id).strip()
                 for task_id in request_text.task_ids if str(task_id).strip()]
     with SessionLocal() as db:
         try:
-            tasks_to_commit = db.query(Task).filter(
-                Task.task_id.in_(task_ids)).all()
-
-            if not tasks_to_commit:
+            tasks = db.query(Task).filter(Task.task_id.in_(task_ids)).all()
+            found_ids = {t.task_id for t in tasks}
+            missing = set(task_ids) - found_ids  # type: ignore
+            if missing:
                 raise HTTPException(
-                    status_code=404, detail="No tasks found for those IDs. Try refreshing.")
+                    status_code=404,
+                    detail=f"Task IDs not found: {sorted(missing)}. Try refreshing.",
+                )
+            if any(bool(t.is_approved) for t in tasks):
+                raise HTTPException(
+                    status_code=400,
+                    detail="One or more tasks are already approved and cannot be rejected.",
+                )
 
-            for task in tasks_to_commit:
+            id_list = list(found_ids)
+            db.query(Dependency).filter(
+                or_(
+                    Dependency.predecessor_task_id.in_(id_list),
+                    Dependency.successor_task_id.in_(id_list),
+                )
+            ).delete(synchronize_session=False)
+
+            db.query(Task).filter(Task.task_id.in_(id_list)).delete(
+                synchronize_session=False)
+
+            db.commit()
+            return {
+                "status": "success",
+                "message": f"Removed {len(id_list)} draft(s) from the queue.",
+            }
+        except HTTPException:
+            raise
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error rejecting drafts: {str(e)}",
+            )
+
+
+@app.patch("/api/drafts/approve")
+async def patch_drafts(request_text: CommitUpdate):
+    """Permanently approve selected rows."""
+    # TODO: add dependency creation
+    task_ids = [str(task_id).strip()
+                for task_id in request_text.task_ids if str(task_id).strip()]
+    with SessionLocal() as db:
+        try:
+            tasks_to_approve = db.query(Task).filter(
+                Task.task_id.in_(task_ids)).all()
+            found_ids = {t.task_id for t in tasks_to_approve}
+            missing = set(task_ids) - found_ids  # type: ignore
+            if missing:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Task IDs not found: {sorted(missing)}. Try refreshing.",
+                )
+
+            for task in tasks_to_approve:
                 task.is_approved = True  # type: ignore
 
             db.commit()
 
-            return {"status": "success", "message": f"Committed {len(tasks_to_commit)} tasks."}
+            return {"status": "success", "message": f"Approved {len(tasks_to_approve)} tasks."}
         except HTTPException:
             raise
         except Exception as e:
@@ -99,11 +154,11 @@ async def patch_updates(request_text: CommitUpdate):
 
 @app.get("/api/tasks")
 def get_tasks():
+    """get all approved updates aka tasks. also get their dependencies"""
     with SessionLocal() as db:
         try:
-            # get all approved updates aka tasks
             tasks = db.query(Task).filter(Task.is_approved == True).all()
-            # get their dependencies
+            # TODO: think about whether succcesors as well would be clutter
             deps = db.query(Dependency).filter(
                 Dependency.successor_task_id.in_([t.task_id for t in tasks])).all()
             predecessor_map = {}

@@ -21,6 +21,53 @@ function includesTextFilter(row, columnId, filterValue) {
     .includes(String(filterValue).toLowerCase());
 }
 
+/** @param {Record<string, number>} order */
+function sortByOrdinalMap(order, unknownRank = 999) {
+  /** @type {import('@tanstack/react-table').SortingFn<any>} */
+  return (rowA, rowB, columnId) => {
+    const a = order[String(rowA.getValue(columnId))] ?? unknownRank;
+    const b = order[String(rowB.getValue(columnId))] ?? unknownRank;
+    return a - b;
+  };
+}
+
+const ACTION_TYPE_SORT_ORDER = {
+  new_task: 0,
+  update: 1,
+  conflict_needs_clarification: 2,
+};
+
+const PRIORITY_SORT_ORDER = {
+  Low: 0,
+  Medium: 1,
+  High: 2,
+  Critical: 3,
+};
+
+const CONFIDENCE_SORT_ORDER = {
+  Low: 0,
+  Medium: 1,
+  High: 2,
+};
+
+/** @param {'start' | 'due'} which */
+function sortByDraftDate(which) {
+  /** @type {import('@tanstack/react-table').SortingFn<any>} */
+  return (rowA, rowB) => {
+    const pick = (row) => {
+      const r = row.original;
+      const raw =
+        which === 'start'
+          ? r.planned_start || r.start_date_raw
+          : r.planned_due || r.due_date_raw;
+      if (raw == null || raw === '') return Number.POSITIVE_INFINITY;
+      const t = Date.parse(String(raw));
+      return Number.isFinite(t) ? t : Number.POSITIVE_INFINITY;
+    };
+    return pick(rowA) - pick(rowB);
+  };
+}
+
 const columns = [
   {
     id: 'project_id',
@@ -54,7 +101,7 @@ const columns = [
       return row.planned_start || row.start_date_raw || '—';
     },
     filterFn: includesTextFilter,
-    sortingFn: 'alphanumeric',
+    sortingFn: sortByDraftDate('start'),
   },
   {
     id: 'due_display',
@@ -65,7 +112,7 @@ const columns = [
       return row.planned_due || row.due_date_raw || '—';
     },
     filterFn: includesTextFilter,
-    sortingFn: 'alphanumeric',
+    sortingFn: sortByDraftDate('due'),
   },
   {
     id: 'status',
@@ -98,7 +145,7 @@ const columns = [
     accessorKey: 'priority',
     header: 'Priority',
     filterFn: includesTextFilter,
-    sortingFn: 'alphanumeric',
+    sortingFn: sortByOrdinalMap(PRIORITY_SORT_ORDER),
   },
   {
     id: 'action_type',
@@ -106,7 +153,7 @@ const columns = [
     header: 'Action Type',
     cell: (info) => String(info.getValue() ?? '').replace(/_/g, ' ') || '—',
     filterFn: includesTextFilter,
-    sortingFn: 'alphanumeric',
+    sortingFn: sortByOrdinalMap(ACTION_TYPE_SORT_ORDER),
   },
   {
     id: 'confidence',
@@ -123,12 +170,12 @@ const columns = [
       );
     },
     filterFn: includesTextFilter,
-    sortingFn: 'alphanumeric',
+    sortingFn: sortByOrdinalMap(CONFIDENCE_SORT_ORDER),
   },
   {
     id: '_select',
     header: () => (
-      <span className="block text-center font-sans text-lg font-semibold leading-tight text-black md:text-xl">
+      <span className="flex w-full flex-col items-center justify-center font-sans text-lg font-semibold leading-tight text-black md:text-xl">
         Select All
       </span>
     ),
@@ -139,10 +186,12 @@ const columns = [
       const { selectedIds = new Set(), onToggle } = meta;
       const id = row.original.task_id;
       return (
-        <Checkbox
-          checked={selectedIds.has(id)}
-          onChange={() => onToggle?.(id)}
-        />
+        <div className="flex items-center justify-center">
+          <Checkbox
+            checked={selectedIds.has(id)}
+            onChange={() => onToggle?.(id)}
+          />
+        </div>
       );
     },
   },
@@ -221,7 +270,7 @@ export default function DraftsDataTable({
                 {hg.headers.map((header) => (
                   <th
                     key={header.id}
-                    className={`px-3 py-3 align-bottom font-sans text-lg md:text-xl font-semibold whitespace-nowrap border-b border-black/10 ${header.column.id === '_select' ? 'text-center' : ''}`}
+                    className={`px-3 py-3 font-sans text-lg md:text-xl font-semibold whitespace-nowrap border-b border-black/10 ${header.column.id === '_select' ? 'align-middle text-center' : 'align-bottom text-left'}`}
                   >
                     {header.column.getCanSort() ? (
                       <button
@@ -243,7 +292,13 @@ export default function DraftsDataTable({
                         </span>
                       </button>
                     ) : (
-                      <span className="inline-flex items-center gap-2">
+                      <span
+                        className={
+                          header.column.id === '_select'
+                            ? 'flex w-full items-center justify-center'
+                            : 'inline-flex items-center gap-2'
+                        }
+                      >
                         {flexRender(
                           header.column.columnDef.header,
                           header.getContext(),
@@ -269,10 +324,10 @@ export default function DraftsDataTable({
                 return (
                   <th
                     key={`f-${header.id}`}
-                    className={`px-3 pb-3 pt-1 align-top border-b border-black/10 ${header.column.id === '_select' ? 'text-center' : ''}`}
+                    className={`px-3 pb-3 pt-1 border-b border-black/10 ${header.column.id === '_select' ? 'align-middle text-center' : 'align-top text-left'}`}
                   >
                     {header.column.id === '_select' ? (
-                      <div className="flex justify-center pt-1">
+                      <div className="flex items-center justify-center py-1">
                         <Checkbox
                           aria-label="Select all visible drafts"
                           checked={allSelected}
@@ -317,7 +372,7 @@ export default function DraftsDataTable({
                   {row.getVisibleCells().map((cell) => (
                     <td
                       key={cell.id}
-                      className="px-3 py-3 align-middle whitespace-nowrap"
+                      className={`px-3 py-3 align-middle whitespace-nowrap ${cell.column.id === '_select' ? 'text-center' : ''}`}
                     >
                       {flexRender(
                         cell.column.columnDef.cell,

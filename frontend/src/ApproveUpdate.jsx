@@ -237,7 +237,7 @@ function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts }) {
           disabled={selectedIds.size === 0 || busy}
           onClick={handleReject}
         >
-          {isRejecting ? 'Removing…' : `Reject (${selectedIds.size})`}
+          {isRejecting ? 'Removing...' : `Reject (${selectedIds.size})`}
         </Button>
       </div>
       {commitError && <p className="error submit-error">{commitError}</p>}

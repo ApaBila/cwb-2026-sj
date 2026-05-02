@@ -13,20 +13,20 @@ function App() {
     <BrowserRouter>
       <Navbar fluid rounded>
         <NavbarBrand>
-          <div className="block text-2xl font-semibold leading-none md:text-3xl">
-            <h1> SJ Project Updater </h1>
+          <div className="block text-sjblue text-2xl font-semibold leading-none md:text-3xl">
+            <h1> SJ Project Manager </h1>
           </div>
-          <div className="block ml-10 text-lg font-normal leading-tight md:text-xl">
+          <div className="block ml-10 text-sjblue text-lg font-normal leading-tight md:text-xl">
             Real impact, <br /> made together 
           </div>
         </NavbarBrand>    
         <NavbarToggle />
         <NavbarCollapse>
           <NavbarLink as={Link} to="/" className="text-2xl font-semibold md:text-3xl">
-            <h1> Approve Update </h1>
+            <h1> Update </h1>
           </NavbarLink>
           <NavbarLink as={Link} to="/Gantt" className="text-2xl font-semibold md:text-3xl">
-            <h1> Gantt </h1>
+            <h1> View </h1>
           </NavbarLink>
         </NavbarCollapse>
 

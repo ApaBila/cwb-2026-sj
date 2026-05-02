@@ -11,7 +11,7 @@ import Gantt from './Gantt';
 function App() {
   return (
     <BrowserRouter>
-      <div className="flex min-h-dvh w-full min-w-0 flex-col">
+      <div className="flex h-svh min-h-0 w-full min-w-0 flex-col overflow-hidden">
       <Navbar fluid className="shrink-0 rounded-none bg-white shadow-none">
         <NavbarBrand>
           <div className="block text-sjblue font-bold leading-none">
@@ -33,7 +33,7 @@ function App() {
 
       </Navbar>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <Routes>
           <Route path="/" element={<ApproveUpdate />} />
           <Route path="/Gantt" element={<Gantt />} />

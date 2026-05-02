@@ -8,6 +8,20 @@
     @apply flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-x-hidden bg-white p-4;
   }
 
+  /**
+   * Gantt route: fill route column, clip overflow so only inner .gantt-body-scroll
+   * scrolls (toolbar + column/timeline headers stay visible).
+   */
+  main.gantt-page {
+    @apply flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-4;
+  }
+
+  /** Flex child that must shrink and pass min-height:0 down the tree (scroll fix). */
+  .gantt-scroll-frame {
+    @apply flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden;
+    flex-basis: 0;
+  }
+
   .compose-block {
     @apply flex shrink-0 flex-col gap-3 min-w-0;
   }
@@ -50,16 +64,16 @@
 
   .sj-action-pill {
     @apply inline-flex w-60 shrink-0 items-center justify-center gap-1 rounded-full border-0 no-underline text-sj-control font-semibold;
-    @apply !bg-sjblue !text-white;
-    @apply hover:!bg-white hover:!text-sjred hover:outline hover:outline-2 hover:outline-offset-2 hover:outline-sjred;
+    @apply bg-sjblue! text-white!;
+    @apply hover:bg-white! hover:text-sjred! hover:outline-2 hover:outline-offset-2 hover:outline-sjred;
     @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-sjblue;
     @apply disabled:pointer-events-none disabled:opacity-[0.55] disabled:cursor-not-allowed;
   }
 
   .sj-action-pill--reject {
     @apply inline-flex w-60 shrink-0 items-center justify-center gap-1 rounded-full border-0 no-underline text-sj-control font-semibold;
-    @apply !bg-sjred !text-white;
-    @apply hover:!bg-white hover:!text-black hover:outline hover:outline-2 hover:outline-offset-2 hover:!outline-black;
+    @apply bg-sjred! text-white!;
+    @apply hover:bg-white! hover:text-black! hover:outline-2 hover:outline-offset-2 hover:outline-black!;
     @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-black;
     @apply disabled:pointer-events-none disabled:opacity-[0.55] disabled:cursor-not-allowed;
   }
@@ -74,5 +88,44 @@
 
   .confidence-low {
     @apply bg-sjred/90 text-white;
+  }
+
+  /** Gantt dependency connectors (orthogonal path in SVG; painted under bars). */
+  .gantt-dependency-link {
+    @apply fill-none pointer-events-none stroke-black/15;
+    stroke-width: 3.5px;
+    stroke-linecap: square;
+    stroke-linejoin: miter;
+  }
+
+  .gantt-dep-arrowhead {
+    @apply fill-black/15;
+  }
+
+  .gantt-grid-line {
+    @apply stroke-black/5;
+    stroke-width: 1px;
+  }
+
+  /** Opaque Gantt task bars (SVG pill rects); painted above dependency paths. */
+  .gantt-bar-track {
+    @apply fill-gray-200;
+  }
+
+  .gantt-bar-fill--high {
+    @apply fill-sjred;
+  }
+
+  .gantt-bar-fill--medium {
+    @apply fill-sjblue;
+  }
+
+  .gantt-bar-fill--low {
+    @apply fill-neutral-500;
+  }
+
+  .gantt-header-line1,
+  .gantt-header-line2 {
+    @apply fill-black font-sans font-semibold text-[9px];
   }
 }

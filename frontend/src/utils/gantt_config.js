@@ -12,6 +12,10 @@ export const GANTT_HEADER_ROW1_PX = 40;
 export const GANTT_HEADER_ROW2_PX = 36;
 export const GANTT_CHART_HEADER_PX = GANTT_HEADER_ROW1_PX + GANTT_HEADER_ROW2_PX;
 
+/** SVG <text> baselines for the two header rows (aligned with frozen thead row heights). */
+export const GANTT_HEADER_LINE1_Y = 24;
+export const GANTT_HEADER_LINE2_Y = 54;
+
 /** Extra space below last bar in the body SVG (px). */
 export const GANTT_CHART_BODY_BOTTOM_PAD = 40;
 

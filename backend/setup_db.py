@@ -1,5 +1,4 @@
 from app.database import engine, Base
-from app.models import Task
 
 print("Connecting to Azure PostgreSQL...")
 

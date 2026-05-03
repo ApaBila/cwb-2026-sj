@@ -1,17 +1,11 @@
 import os
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
 from pathlib import Path
 
-env_path = Path(__file__).resolve().parent.parent / ".env"
-if env_path.exists():
-    for raw_line in env_path.read_text().splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
 
-        key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 

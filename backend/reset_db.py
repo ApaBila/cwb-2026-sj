@@ -1,14 +1,9 @@
 import os
 from sqlalchemy import create_engine, text
 from pathlib import Path
+from dotenv import load_dotenv
 
-env_path = Path(__file__).resolve().parent / ".env"
-if env_path.exists():
-    for line in env_path.read_text().splitlines():
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, v = line.split("=", 1)
-        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 engine = create_engine(os.environ.get("DATABASE_URL"))
 

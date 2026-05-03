@@ -1,286 +1,131 @@
-.page-shell {
-  min-height: 100svh;
-  min-width: fit-content;
-}
+@reference "./index.css";
+
+@layer components {
+  /**
+   * Fills space below navbar (see App.jsx shell). Inner panes own vertical scroll.
+   */
+  main {
+    @apply flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-x-hidden bg-white p-4;
+  }
+
+  /**
+   * Gantt route: fill route column, clip overflow so only inner .gantt-body-scroll
+   * scrolls (toolbar + column/timeline headers stay visible).
+   */
+  main.gantt-page {
+    @apply flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-4;
+  }
+
+  /** Flex child that must shrink and pass min-height:0 down the tree (scroll fix). */
+  .gantt-scroll-frame {
+    @apply flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden;
+    flex-basis: 0;
+  }
+
+  .compose-block {
+    @apply flex shrink-0 flex-col gap-3 min-w-0;
+  }
+
+  /** Holds scrollable drafts + sticky approve/reject bar. */
+  .drafts-block {
+    @apply flex min-h-0 min-w-0 flex-1 flex-col gap-3;
+  }
+
+  .drafts-container {
+    @apply flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden;
+  }
+
+  /** No border/shadow so actions read as one surface with the page; buttons unchanged. */
+  .approve-actions {
+    @apply sticky bottom-0 z-30 flex shrink-0 flex-wrap justify-end gap-3 bg-white pt-2 pb-0 outline-none;
+  }
+
+  .message-input {
+    @apply w-full min-h-25 border-2 border-sjblue bg-white p-4 text-black shadow-none outline-none resize-none rounded-none box-border focus:border-sjred text-sj-body;
+  }
+
+  .message-input::placeholder {
+    @apply text-black/50 text-sj-control font-normal;
+  }
+
+  .no-drafts {
+    @apply text-black/80 text-sj-control font-medium leading-snug;
+  }
+
+  .error,
+  .submit-error {
+    @apply m-0 text-sjred font-mono text-sj-body;
+  }
+
+  .confidence-badge {
+    @apply inline-flex items-center whitespace-nowrap rounded-full px-5 py-0.5 font-sans font-semibold text-sj-body;
+  }
 
 
-.panel-layout {
-  display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(400px, 2fr);
-  gap: 24px;
-  margin: 24px 24px 24px 24px;
-  min-height: 320px;
-}
+  .sj-action-pill {
+    @apply inline-flex w-60 shrink-0 items-center justify-center gap-1 rounded-full border-0 no-underline text-sj-control font-semibold;
+    @apply bg-sjblue! text-white!;
+    @apply hover:bg-white! hover:text-sjred! hover:outline-2 hover:outline-offset-2 hover:outline-sjred;
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-sjblue;
+    @apply disabled:pointer-events-none disabled:opacity-[0.55] disabled:cursor-not-allowed;
+  }
 
-.panel {
-  border: 1px solid var(--sjblue);
-  border-radius: 28px;
-  background: var(--bg);
-  padding: 28px;
-  box-sizing: border-box;
-}
+  .sj-action-pill--reject {
+    @apply inline-flex w-60 shrink-0 items-center justify-center gap-1 rounded-full border-0 no-underline text-sj-control font-semibold;
+    @apply bg-sjred! text-white!;
+    @apply hover:bg-white! hover:text-black! hover:outline-2 hover:outline-offset-2 hover:outline-black!;
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-black;
+    @apply disabled:pointer-events-none disabled:opacity-[0.55] disabled:cursor-not-allowed;
+  }
 
-.panel-left, .panel-right {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: 16px;
-}
+  .confidence-high {
+    @apply bg-black/20 text-white;
+  }
 
-.message-input {
-  width: 100%;
-  min-height: 240px;
-  border: 1px solid var(--sjblue);
-  border-radius: 24px;
-  padding: 24px 24px;
-  box-sizing: border-box;
-  font-family: var(--sans);
-  font-size: 18px;
-  color: var(--text);
-  background: var(--bg);
-  resize: none;
-  outline: none;
-}
+  .confidence-medium {
+    @apply bg-sjblue/80 text-white;
+  }
 
-.message-input::placeholder {
-  color: var(--text);
-  opacity: 0.5;
-}
+  .confidence-low {
+    @apply bg-sjred/90 text-white;
+  }
 
-.message-input:focus {
-  border-color: var(--sjred);
-  outline: 2px solid var(--sjred);
-  outline-offset: 2px;
-}
+  /** Gantt dependency connectors (orthogonal path in SVG; painted under bars). */
+  .gantt-dependency-link {
+    @apply fill-none pointer-events-none stroke-black/15;
+    stroke-width: 3.5px;
+    stroke-linecap: square;
+    stroke-linejoin: miter;
+  }
 
-.blue-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 999px;
-  padding: 16px 32px;
-  background: var(--sjblue);
-  color: var(--bg);
-  font-family: var(--sans);
-  font-size: 16px;
-  font-weight: 1000;
-  line-height: 1;
-}
+  .gantt-dep-arrowhead {
+    @apply fill-black/15;
+  }
 
-.blue-button:hover {
-  background: var(--bg);
-  color: var(--sjred);
-  outline: 2px solid var(--sjred);
-  outline-offset: 2px;
-}
+  .gantt-grid-line {
+    @apply stroke-black/5;
+    stroke-width: 1px;
+  }
 
-.blue-button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
+  /** Opaque Gantt task bars (SVG pill rects); painted above dependency paths. */
+  .gantt-bar-track {
+    @apply fill-gray-200;
+  }
 
-.submit-error {
-  margin: 0;
-  color: var(--sjred);
-  font-family: var(--sans);
-  font-size: 14px;
-}
+  .gantt-bar-fill--high {
+    @apply fill-sjred;
+  }
 
-.submit-result {
-  margin: 0;
-  border: 1px solid var(--sjblue);
-  border-radius: 16px;
-  padding: 16px;
-  max-height: 360px;
-  overflow: auto;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: 12px;
-  line-height: 1.4;
-}
+  .gantt-bar-fill--medium {
+    @apply fill-sjblue;
+  }
 
-.drafts-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 16px;
-}
+  .gantt-bar-fill--low {
+    @apply fill-neutral-500;
+  }
 
-.drafts-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.drafts-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.select-all-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--text);
-}
-
-.select-all-checkbox {
-  cursor: pointer;
-  width: 16px;
-  height: 16px;
-}
-
-.no-drafts {
-  margin: 0;
-  color: var(--text);
-  opacity: 0.6;
-  font-family: var(--sans);
-  font-size: 14px;
-}
-
-.drafts-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 480px;
-  overflow-y: auto;
-}
-
-.draft-item {
-  display: flex;
-  align-items: stretch;
-  border: 1px solid var(--sjblue);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.draft-checkbox-label {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  cursor: pointer;
-  width: 100%;
-  padding: 12px;
-  transition: background-color 0.15s ease;
-}
-
-.draft-checkbox-label:hover {
-  background-color: color-mix(in srgb, var(--sjblue) 10%, transparent);
-}
-
-.draft-checkbox {
-  margin-top: 4px;
-  cursor: pointer;
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-}
-
-.draft-content {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
-  font-family: var(--sans);
-  font-size: 13px;
-  color: var(--text);
-}
-
-.draft-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.draft-header strong {
-  font-weight: 600;
-  font-size: 14px;
-  flex: 1;
-}
-
-.draft-badges {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.confidence-badge {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.confidence-high {
-  background-color: color-mix(in srgb, #10b981 20%, transparent);
-  color: #047857;
-}
-
-.confidence-medium {
-  background-color: color-mix(in srgb, #f59e0b 20%, transparent);
-  color: #b45309;
-}
-
-.confidence-low {
-  background-color: color-mix(in srgb, var(--sjred) 20%, transparent);
-  color: var(--sjred);
-}
-
-.action-type-badge {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  background-color: color-mix(in srgb, var(--sjblue) 20%, transparent);
-  color: var(--sjblue);
-  text-transform: capitalize;
-  white-space: nowrap;
-}
-
-.draft-badge {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 700;
-  background-color: color-mix(in srgb, var(--sjred) 30%, transparent);
-  color: var(--sjred);
-  white-space: nowrap;
-}
-
-.draft-details {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px 12px;
-}
-
-.detail-row {
-  display: flex;
-  gap: 6px;
-  line-height: 1.3;
-}
-
-.detail-label {
-  font-weight: 600;
-  color: var(--text);
-  opacity: 0.7;
-  flex-shrink: 0;
-}
-
-.detail-value {
-  color: var(--text);
-  flex: 1;
-  word-break: break-word;
+  .gantt-header-line1,
+  .gantt-header-line2 {
+    @apply fill-black font-sans font-semibold text-[9px];
+  }
 }

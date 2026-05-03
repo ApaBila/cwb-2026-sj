@@ -1,4 +1,8 @@
-# React + Vite
+# Frontend Development
+
+Check root README for usage.
+
+## React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
@@ -14,3 +18,16 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+
+## Drafts table (sort / filter)
+
+The approval drafts grid uses **TanStack Table** v8 (MIT) for headless sorting and per-column text filters:
+
+- Docs: [tanstack.com/table](https://tanstack.com/table/latest)
+- Source: [github.com/TanStack/table](https://github.com/TanStack/table)
+
+# Flowbite
+
+Other UI (navbar, buttons, Gantt controls) uses [Flowbite React](https://flowbite-react.com/).
+

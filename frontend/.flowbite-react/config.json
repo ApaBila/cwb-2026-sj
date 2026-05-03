@@ -1,0 +1,25 @@
+{
+  "$schema": "https://unpkg.com/flowbite-react/schema.json",
+  "components": [
+    "Checkbox",
+    "Table",
+    "TableBody",
+    "TableCell",
+    "TableHead",
+    "TableHeadCell",
+    "TableRow",
+     "Navbar", 
+     "NavbarBrand", 
+     "NavbarCollapse", 
+     "NavbarLink", 
+     "NavbarToggle",
+     "Spinner",
+     "Progress"
+  ],
+  "dark": false,
+  "path": "src/components",
+  "prefix": "",
+  "rsc": true,
+  "tsx": false,
+  "version": 4
+}

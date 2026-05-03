@@ -1,15 +1,19 @@
+import os
 import uuid
 from agent_framework import Agent
 from agent_framework.foundry import FoundryChatClient
-from azure.identity import AzureCliCredential
+from azure.identity import DefaultAzureCredential
 
 from app.schemas import TaskUpdateList, TaskUpdate
 from app.services.change_detector import query_existing_tasks
 
 client = FoundryChatClient(
-    project_endpoint="https://cwb-sj-planner.services.ai.azure.com/api/projects/cwb-sj-planner",
-    model="gpt-4.1-mini-1",
-    credential=AzureCliCredential(),
+    project_endpoint=os.getenv(
+        "FOUNDRY_PROJECT_ENDPOINT",
+        "https://cwb-sj-planner.services.ai.azure.com/api/projects/cwb-sj-planner",
+    ),
+    model=os.getenv("FOUNDRY_MODEL", "gpt-4.1-mini-1"),
+    credential=DefaultAzureCredential(),
 )
 
 updater_agent = Agent(

@@ -29,7 +29,8 @@ npm install
 * Create an Azure Resource Group. Within it,
     * Create an Azure AI deployment.
     * Create an Azure PostgreSQL database.
-* Now in this repo, create a backend/app/.env file with your Azure AI API key and Azure PostgreSQL database URL.
+    * Create a Microsoft Foundry project. Replace the details in update_formatter.py with your own.
+* Now in this repo, create a backend/app/.env file with your Azure PostgreSQL database URL. The agent stack talks to Azure AI through Foundry using Azure identity (e.g. `az login` on your laptop for local dev).
 
 ## Usage
 
@@ -58,6 +59,9 @@ npm run dev
 ```
 
 This will be served at `http://localhost:5173/`.
+
+## Hosting
+For the hackathon demo I use Azure VM: nginx serves the Vite `dist` and proxies `/api/` to uvicorn, systemd keeps the backend up from the project venv.
 
 <!-- todo: ## Acessibility -->
 

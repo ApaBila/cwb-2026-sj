@@ -4,6 +4,7 @@
  * - Docs: https://tanstack.com/table/latest
  * - Source: https://github.com/TanStack/table
  */
+import { useMemo } from 'react';
 import {
   flexRender,
   getCoreRowModel,
@@ -12,6 +13,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { Checkbox } from 'flowbite-react';
+import { ownerInitials } from './utils/initials';
 
 function includesTextFilter(row, columnId, filterValue) {
   if (filterValue == null || filterValue === '') return true;
@@ -68,7 +70,38 @@ function sortByDraftDate(which) {
   };
 }
 
-const columns = [
+/** Subset aligned with Gantt frozen columns (Project / Task / Owner). */
+const UNSCHEDULED_COLUMNS = [
+  {
+    id: 'project_id',
+    accessorKey: 'project_id',
+    header: 'Project',
+    cell: (info) => info.getValue() || '—',
+    filterFn: includesTextFilter,
+    sortingFn: 'alphanumeric',
+  },
+  {
+    id: 'task_title',
+    accessorKey: 'task_title',
+    header: 'Task',
+    filterFn: includesTextFilter,
+    sortingFn: 'alphanumeric',
+  },
+  {
+    id: 'owner_name',
+    accessorFn: (row) =>
+      [row.owner_name, row.owner_id].filter(Boolean).join(' ') || '',
+    header: 'Owner',
+    cell: (info) => {
+      const r = info.row.original;
+      return ownerInitials(r.owner_name, r.owner_id);
+    },
+    filterFn: includesTextFilter,
+    sortingFn: 'alphanumeric',
+  },
+];
+
+const FULL_COLUMNS = [
   {
     id: 'project_id',
     accessorKey: 'project_id',
@@ -200,6 +233,7 @@ const columns = [
  * narrows — the outer wrapper scrolls horizontally instead. Sum of col widths.
  */
 const DRAFTS_TABLE_MIN_WIDTH_PX = 1180;
+const UNSCHEDULED_TABLE_MIN_WIDTH_PX = 520;
 
 /** `table-layout: fixed` column widths (px). Order matches `columns`. */
 const DRAFTS_COLGROUP = (
@@ -219,30 +253,53 @@ const DRAFTS_COLGROUP = (
   </colgroup>
 );
 
+const UNSCHEDULED_COLGROUP = (
+  <colgroup>
+    <col style={{ width: 120 }} />
+    <col style={{ width: 280 }} />
+    <col style={{ width: 120 }} />
+  </colgroup>
+);
+
 /**
  * @param {{
  *   drafts: Record<string, unknown>[],
- *   selectedIds: Set<string>,
- *   onToggle: (taskId: string) => void,
- *   onToggleAllFiltered: (ids: string[]) => void,
+ *   selectedIds?: Set<string>,
+ *   onToggle?: (taskId: string) => void,
+ *   onToggleAllFiltered?: (ids: string[]) => void,
+ *   variant?: 'drafts' | 'unscheduled',
+ *   layout?: 'default' | 'embedded',
+ *   embeddedFillViewport?: boolean,
  * }} props
  */
 export default function DraftsDataTable({
   drafts,
-  selectedIds,
-  onToggle,
-  onToggleAllFiltered,
+  selectedIds = new Set(),
+  onToggle = () => {},
+  onToggleAllFiltered = () => {},
+  variant = 'drafts',
+  layout = 'default',
+  embeddedFillViewport = false,
 }) {
+  const activeColumns = useMemo(
+    () => (variant === 'unscheduled' ? UNSCHEDULED_COLUMNS : FULL_COLUMNS),
+    [variant],
+  );
+
   // TanStack Table returns unstable function refs; React Compiler skips memoization — safe here.
   // eslint-disable-next-line react-hooks/incompatible-library -- https://github.com/TanStack/table
   const table = useReactTable({
     data: drafts,
-    columns,
+    columns: activeColumns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     initialState: {
-      sorting: [{ id: 'due_display', desc: false }],
+      sorting: [
+        variant === 'unscheduled'
+          ? { id: 'task_title', desc: false }
+          : { id: 'due_display', desc: false },
+      ],
     },
     meta: {
       selectedIds,
@@ -258,9 +315,20 @@ export default function DraftsDataTable({
   const hasFilters = table.getState().columnFilters.length > 0;
 
   const headerGroup = table.getHeaderGroups()[0];
+  const minWidth =
+    variant === 'unscheduled' ? UNSCHEDULED_TABLE_MIN_WIDTH_PX : DRAFTS_TABLE_MIN_WIDTH_PX;
+  const colgroup = variant === 'unscheduled' ? UNSCHEDULED_COLGROUP : DRAFTS_COLGROUP;
+  const rowLabel = variant === 'unscheduled' ? 'unscheduled tasks' : 'drafts';
+  const embedFill =
+    layout === 'embedded' && embeddedFillViewport;
+  const wrapClass = embedFill
+    ? 'drafts-table-wrap flex min-h-0 min-w-0 flex-1 flex-col gap-2'
+    : layout === 'embedded'
+      ? 'drafts-table-wrap flex min-w-0 flex-col gap-2'
+      : 'drafts-table-wrap flex min-h-0 min-w-0 flex-1 flex-col gap-2';
 
   return (
-    <div className="drafts-table-wrap flex min-h-0 min-w-0 flex-1 flex-col gap-2">
+    <div className={wrapClass}>
       <div className="flex shrink-0 flex-wrap items-baseline gap-3">
         <p className="sj-text-h2 text-black">
           Showing{' '}
@@ -268,7 +336,7 @@ export default function DraftsDataTable({
             {table.getFilteredRowModel().rows.length}
           </strong>
           {' / '}
-          <span className="text-black">{drafts.length}</span> drafts
+          <span className="text-black">{drafts.length}</span> {rowLabel}
           {hasFilters ? (
             <span className="text-black/70"> (filtered)</span>
           ) : null}
@@ -284,12 +352,20 @@ export default function DraftsDataTable({
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-x-contain border border-black/10 bg-white">
+      <div
+        className={
+          embedFill
+            ? 'min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-x-contain border border-black/10 bg-white'
+            : layout === 'embedded'
+              ? 'overflow-x-auto overflow-y-auto overscroll-x-contain border border-black/10 bg-white'
+              : 'min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-x-contain border border-black/10 bg-white'
+        }
+      >
         <table
           className="table-fixed w-full text-left text-black"
-          style={{ minWidth: DRAFTS_TABLE_MIN_WIDTH_PX }}
+          style={{ minWidth: minWidth }}
         >
-          {DRAFTS_COLGROUP}
+          {colgroup}
           <thead className="bg-black/10 text-black">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
@@ -383,10 +459,14 @@ export default function DraftsDataTable({
             {table.getRowModel().rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={columns.length}
+                  colSpan={activeColumns.length}
                   className="px-3 py-6 text-center font-sans text-sj-body text-black/70"
                 >
-                  No rows match the current filters.
+                  {hasFilters
+                    ? 'No rows match the current filters.'
+                    : variant === 'unscheduled'
+                      ? 'No unscheduled tasks.'
+                      : 'No rows match the current filters.'}
                 </td>
               </tr>
             ) : (

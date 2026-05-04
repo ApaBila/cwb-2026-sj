@@ -52,7 +52,8 @@ async def post_drafts(request_text: UpdateRequest):
     user_text = request_text.user_text
 
     try:
-        no_ai = os.getenv("SJ_NO_AI", "").strip().lower() in ("1", "true", "yes")
+        no_ai = os.getenv("SJ_NO_AI", "").strip(
+        ).lower() in ("1", "true", "yes")
         ai_response = await format_update(user_text, no_ai=no_ai)
         print(ai_response)
     except APIStatusError as e:
@@ -62,9 +63,9 @@ async def post_drafts(request_text: UpdateRequest):
         )
     # Check action types for all tasks and detect changes
     with SessionLocal() as db:
-        detect_changes_batched(db, ai_response.tasks)
+        detect_changes_batched(db, ai_response.tasks)  # type: ignore
 
-    return ai_response.model_dump(mode='json')
+    return ai_response.model_dump(mode='json')  # type: ignore
 
 
 @app.get("/api/drafts")

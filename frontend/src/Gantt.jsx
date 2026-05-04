@@ -14,6 +14,7 @@ import {
 import { ownerInitials } from './utils/initials';
 import { sortTasksForGanttLayout } from './utils/gantt_task_order';
 import { ganttDependencyPathD } from './utils/gantt_dependency_path';
+import DraftsDataTable from './DraftsDataTable';
 
 /** Width of sticky identifier column (px). */
 const FROZEN_PANEL_WIDTH = 252;
@@ -73,6 +74,9 @@ function ganttHeaderPair(viewMode, d) {
   return { line1: '', line2: '' };
 }
 
+/** Unscheduled row count above which the table block fills one viewport (scroll inside). */
+const UNSCHEDULED_VIEWPORT_THRESHOLD = 15;
+
 /** Predecessor / successor rows for tooltip (`inChart` → link scrolls within current layout). */
 function predSuccDetails(bar, bars) {
   const predIds = bar.dependencies || [];
@@ -88,6 +92,7 @@ function predSuccDetails(bar, bars) {
 
 function Gantt() {
   const [tasks, setTasks] = useState([]);
+  const [unscheduledTasks, setUnscheduledTasks] = useState([]);
   const [draftsCount, setDraftsCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState(DEFAULT_VIEW_MODES[0].name);
@@ -111,6 +116,8 @@ function Gantt() {
   const scrollToBarByIdRef = useRef(() => {});
   const tooltipWidth = 320;
 
+  const emptySelection = useMemo(() => new Set(), []);
+
   const apiBaseUrl = import.meta.env.DEV ? 'http://localhost:8000' : '';
 
   const fetchDraftsCount = useCallback(async () => {
@@ -129,14 +136,15 @@ function Gantt() {
     try {
       const res = await fetch(`${apiBaseUrl}/api/tasks`);
       const data = await res.json();
-      const normalized = data
-        .map((t) => ({
-          ...t,
-          planned_start: t.planned_start ? date_utils.parse(t.planned_start) : null,
-          planned_due: t.planned_due ? date_utils.parse(t.planned_due) : null,
-        }))
-        .filter((t) => t.planned_start && t.planned_due);
-      setTasks(normalized);
+      const normalized = data.map((t) => ({
+        ...t,
+        planned_start: t.planned_start ? date_utils.parse(t.planned_start) : null,
+        planned_due: t.planned_due ? date_utils.parse(t.planned_due) : null,
+      }));
+      setTasks(normalized.filter((t) => t.planned_start && t.planned_due));
+      setUnscheduledTasks(
+        normalized.filter((t) => !t.planned_start || !t.planned_due),
+      );
     } catch (e) {
       console.error('Failed to fetch tasks', e);
     } finally {
@@ -414,10 +422,38 @@ function Gantt() {
       ? layout.bars.length * layout.rowHeight + GANTT_CHART_BODY_BOTTOM_PAD
       : 0;
 
+  const unscheduledN = unscheduledTasks.length;
+  const unscheduledTall = unscheduledN > UNSCHEDULED_VIEWPORT_THRESHOLD;
+
   return (
     <main className="gantt-page bg-white">
-    <Card className="gantt-card flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-white p-4 shadow-none">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="gantt-split">
+      <section
+        className={`gantt-unscheduled-panel ${
+          unscheduledTall ? 'gantt-unscheduled-panel--viewport' : 'gantt-unscheduled-panel--fit'
+        }`}
+        aria-label="Unscheduled Tasks"
+      >
+        <h2 className="sj-text-h2 m-0 shrink-0 font-semibold text-black">Unscheduled Tasks</h2>
+        <div
+          className={
+            unscheduledTall
+              ? 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'
+              : 'flex min-w-0 flex-col'
+          }
+        >
+        <DraftsDataTable
+          variant="unscheduled"
+          layout="embedded"
+          embeddedFillViewport={unscheduledTall}
+          drafts={unscheduledTasks}
+          selectedIds={emptySelection}
+          onToggle={() => {}}
+          onToggleAllFiltered={() => {}}
+        />
+        </div>
+      </section>
+      <section className="gantt-chart-panel min-h-0" aria-label="Schedule">
       <div className="gantt-scroll-frame">
       <div className="mb-3 flex shrink-0 flex-wrap items-baseline justify-between gap-3">
         <div className="relative z-50 flex flex-wrap items-center gap-2">
@@ -479,7 +515,7 @@ function Gantt() {
         </div>
       </div>
 
-      <div className="gantt-chart-root relative z-0 flex min-h-0 min-w-0 flex-1 basis-0 flex-col overflow-hidden border border-black/10 bg-white">
+      <div className="gantt-chart-root relative z-0 flex min-h-0 min-w-0 flex-1 basis-0 flex-col overflow-hidden bg-white">
         {layout ? (
           <>
             {/* Fixed-height header: thead + timeline (horizontal scroll synced with body). */}
@@ -896,8 +932,8 @@ function Gantt() {
         )}
       </div>
       </div>
+      </section>
       </div>
-    </Card>
     </main>
   );
 }

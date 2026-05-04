@@ -1,5 +1,13 @@
 @reference "./index.css";
 
+/**
+ * Sticky app navbar (Flowbite + two-line brand). Used to size full-viewport panes
+ * so they match the visible content column below the nav, not the whole dvh.
+ */
+:root {
+  --sj-app-nav-height: 5.5rem;
+}
+
 @layer components {
   /**
    * Fills space below navbar (see App.jsx shell). Inner panes own vertical scroll.
@@ -9,17 +17,47 @@
   }
 
   /**
-   * Gantt route: fill route column, clip overflow so only inner .gantt-body-scroll
-   * scrolls (toolbar + column/timeline headers stay visible).
+   * Gantt route: stacked sections; page scrolls vertically (see App route outlet).
+   * flex-none: do not use global main flex-1 — height follows content so the outlet scrolls.
    */
   main.gantt-page {
-    @apply flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-4;
+    @apply flex w-full min-w-0 flex-none flex-col gap-3 overflow-x-hidden p-3 sm:gap-4 sm:p-4;
   }
 
-  /** Flex child that must shrink and pass min-height:0 down the tree (scroll fix). */
+  /** Vertical stack: independent blocks; page scroll connects them. */
+  .gantt-split {
+    @apply flex w-full min-w-0 flex-col gap-3;
+  }
+
+  .gantt-unscheduled-panel {
+    @apply flex w-full flex-col gap-2 border border-black/10 bg-white p-3 sm:p-4;
+  }
+
+  /** n > 15: capped height; rows scroll inside (shorter than full viewport). */
+  .gantt-unscheduled-panel--viewport {
+    @apply h-[45dvh] max-h-[45dvh] min-h-0 shrink-0 overflow-hidden;
+  }
+
+  /** n ≤ 15: height follows table content. */
+  .gantt-unscheduled-panel--fit {
+    @apply shrink-0;
+  }
+
+  /**
+   * One “screen” of chart below the sticky nav (not 100dvh, which ignores nav and feels oversized).
+   * Explicit height so inner flex (gantt-scroll-frame flex-1) gets real space.
+   */
+  .gantt-chart-panel {
+    @apply flex w-full min-w-0 shrink-0 flex-col overflow-hidden border border-black/10 bg-white p-3 sm:p-4;
+    height: calc(100dvh - var(--sj-app-nav-height));
+    min-height: calc(100dvh - var(--sj-app-nav-height));
+  }
+
+  /** Fills the chart panel; inner chart body scrolls. */
   .gantt-scroll-frame {
     @apply flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden;
     flex-basis: 0;
+    min-height: 0;
   }
 
   .compose-block {

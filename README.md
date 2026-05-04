@@ -31,6 +31,7 @@ npm install
     * Create an Azure PostgreSQL database.
     * Create a Microsoft Foundry project. Replace the details in update_formatter.py with your own.
 * Now in this repo, create a backend/app/.env file with your Azure PostgreSQL database URL. The agent stack talks to Azure AI through Foundry using Azure identity (e.g. `az login` on your laptop for local dev).
+* Optional local dev: add `SJ_NO_AI=true` to the backend `.env` so empty drafts are created as in "update_formatter.py" instead of actually calling Foundry agent (saves credits). Not for production.
 
 ## Usage
 

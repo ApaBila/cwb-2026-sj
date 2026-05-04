@@ -1,9 +1,11 @@
+import os
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from .database import SessionLocal
 from .services.update_formatter import format_update
 from .schemas import UpdateRequest
 from openai import APIStatusError
-from .database import SessionLocal
 from .services.change_detector import detect_changes_batched
 from sqlalchemy import text, or_
 from .schemas import CommitUpdate
@@ -50,7 +52,8 @@ async def post_drafts(request_text: UpdateRequest):
     user_text = request_text.user_text
 
     try:
-        ai_response = await format_update(user_text, no_ai=request_text.no_ai)
+        no_ai = os.getenv("SJ_NO_AI", "").strip().lower() in ("1", "true", "yes")
+        ai_response = await format_update(user_text, no_ai=no_ai)
         print(ai_response)
     except APIStatusError as e:
         raise HTTPException(

@@ -23,7 +23,6 @@ function SubmitUpdate({ apiBaseUrl, refreshDrafts }) {
         },
         body: JSON.stringify({
           user_text: message,
-          no_ai: true,
         }),
       })
 

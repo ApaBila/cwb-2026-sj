@@ -46,8 +46,6 @@ class TaskUpdateList(BaseModel):
 
 class UpdateRequest(BaseModel):
     user_text: str = Field()
-    no_ai: bool = Field(
-        default=False, description="Set True for dev mode, no AI to save Azure credits")
 
 
 class CommitUpdate(BaseModel):

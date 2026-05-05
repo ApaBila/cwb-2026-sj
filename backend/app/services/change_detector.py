@@ -5,11 +5,12 @@ from ..schemas import TaskUpdate
 from agent_framework import tool
 from app.database import SessionLocal
 from sqlalchemy import text
+import json
 
 # https://github.com/Azure-Samples/postgres-agents/tree/main/azure-ai-agent-service
 
 
-@tool(approval_mode="never_require")
+@tool(approval_mode="never_require", max_invocations=7)
 def query_existing_tasks(query_str: str):
     """Tool function to query the database. 
     Must be one query that starts with SELECT. 
@@ -22,9 +23,9 @@ def query_existing_tasks(query_str: str):
         raise ValueError("Only one query at a time is allowed")
 
     with SessionLocal() as db:
-        result = db.execute(text(query_str)).all()
+        result = db.execute(text(query_str)).mappings().all()
     print(result)
-    return result
+    return json.dumps(list(result), default=str)
 
 
 def detect_changes_batched(db: Session, task_updates: list[TaskUpdate]):

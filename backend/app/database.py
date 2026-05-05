@@ -9,7 +9,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-engine = create_engine(DATABASE_URL, echo=True)  # type: ignore
+engine = create_engine(DATABASE_URL)  # type: ignore
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

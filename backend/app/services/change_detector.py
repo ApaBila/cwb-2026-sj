@@ -78,16 +78,16 @@ def detect_changes_batched(db: Session, task_updates: list[TaskUpdate]):
         person_exists = task_update.owner_id in existing_person_map if task_update.owner_id else True
         entities_valid = project_exists and person_exists
 
-        if existing_task:
-            if task_update.action_type in ["new_task", "conflict_needs_clarification"]:
-                final_action = "conflict_needs_clarification"
-            else:
-                final_action = "update"
-        else:
-            if task_update.action_type in ["update", "conflict_needs_clarification"]:
-                final_action = "conflict_needs_clarification"
-            else:
-                final_action = "new_task"
+        # if existing_task:
+        #     if task_update.action_type in ["new_task", "conflict_needs_clarification"]:
+        #         final_action = "conflict_needs_clarification"
+        #     else:
+        #         final_action = "update"
+        # else:
+        #     if task_update.action_type in ["update", "conflict_needs_clarification"]:
+        #         final_action = "conflict_needs_clarification"
+        #     else:
+        #         final_action = "new_task"
 
         # If referenced entities are missing, escalate to conflict
         if not entities_valid:
@@ -95,7 +95,7 @@ def detect_changes_batched(db: Session, task_updates: list[TaskUpdate]):
                 f"Referenced entities missing: project_exists={project_exists}, person_exists={person_exists}")
             final_action = "conflict_needs_clarification"
 
-        print(f"Final action: {final_action}")
+        # print(f"Final action: {final_action}")
 
         try:
             task_data = extract_task_data(task_update)
@@ -105,7 +105,7 @@ def detect_changes_batched(db: Session, task_updates: list[TaskUpdate]):
                 task_data["task_id"] = f"DRAFT_{uuid.uuid4().hex[:8].upper()}"
                 print(f"Generated new task_id: {task_data['task_id']}")
 
-            task_data["action_type"] = final_action
+            # task_data["action_type"] = final_action
             task_data["is_approved"] = False
             pending_rows.append(task_data)
         except Exception as e:

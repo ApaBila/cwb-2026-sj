@@ -48,5 +48,13 @@ class UpdateRequest(BaseModel):
     user_text: str = Field()
 
 
+class WorkflowExecutionResponse(BaseModel):
+    turns: int
+    # key_findings: str = Field(
+    #     description="Key findings include: unknowns and uncertainties that the detail extractor agent found, change detection agent's help with those and anything else, and finally how the details agent changed their answer based on the change detection agent's feedback for that issue.")
+    concise_chat: List[str] = Field(
+        description="""Replay the conversation between the detail extractor agent and change detection agent but edit to keep short,  simple, and clear. Use this format: \nTurn {#}: {agent_name}: {their response}""")
+
+
 class CommitUpdate(BaseModel):
     task_ids: List[str] = Field(min_length=1)

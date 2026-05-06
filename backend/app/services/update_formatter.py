@@ -13,6 +13,9 @@ from app.models import Task, Project, Person, Dependency
 
 # https://github.com/microsoft/agent-framework/blob/main/python/samples/03-workflows/agents/azure_ai_agents_streaming.py
 
+TEMPERATURE = 0.01
+SEED = 123
+
 client = FoundryChatClient(
     project_endpoint=os.getenv(
         "FOUNDRY_PROJECT_ENDPOINT",
@@ -25,6 +28,7 @@ client = FoundryChatClient(
 details_agent = Agent(
     client=client,
     name="SJ-Details-Agent",
+    default_options={"temperature": TEMPERATURE, "seed": SEED},
     instructions=f"""
     You are the SJ Group Details Agent.
     You are part of an elite team of agents that will analyze unstructured meeting notes, emails, and turn them into structured task updates.
@@ -35,7 +39,7 @@ details_agent = Agent(
     The Workflow Executor Agent will execute a workflow between you and the Change Detection Agent.
     This back and forth is for you to refine your details based on factual database responses, and the Workflow Agent will give an editorialized summary of this to the Formatter Agent.
     You should clearly state if you believe you need another attempt due to uncertainty, especially if it might be resolved with the Change Detection Agent's feedback.
-    Finally, the Formatter Agent will make take the user input and the Workflow Agent's response and format it into TaskUpdate objects that are formatted as: {json.dumps(TaskUpdate.model_json_schema(), indent=2)} for best database ingestion.
+    Finally, the Formatter Agent will make take the user input and the Workflow Agent's response and format it into TaskUpdate objects that are formatted as: {json.dumps(TaskUpdate.model_json_schema(), indent=2, sort_keys=True)} for best database ingestion.
     You should be conservative and highlight uncertainties for succeeding agents.
     Note clearly when you've exhausted your resources and are making a final attempt.
     Your response can be a list of tasks with details gleaned from the input and "Unknown"/"Unspecified"/null otherwise.
@@ -47,6 +51,7 @@ details_agent = Agent(
 change_detection_agent = Agent(
     client=client,
     name="SJ-Change-Detection-Agent",
+    default_options={"temperature": TEMPERATURE, "seed": SEED},
     tools=[query_existing_tasks],
     instructions=f"""
     You are the SJ Group Task Change Detection Agent.
@@ -69,7 +74,7 @@ change_detection_agent = Agent(
     You can use as many queries as needed. Not catching a previous task is much worse than taking a long time or falsely identifying a task when you could mark it for conflict.
     But remember to batch queries when possible.
     These are the tables you can query:
-    {json.dumps({"Tasks": Task.__table__.columns.keys(), "Projects": Project.__table__.columns.keys(), "People": Person.__table__.columns.keys(), "Dependencies": Dependency.__table__.columns.keys()}, indent=2)}
+    {json.dumps({"Tasks": Task.__table__.columns.keys(), "Projects": Project.__table__.columns.keys(), "People": Person.__table__.columns.keys(), "Dependencies": Dependency.__table__.columns.keys()}, indent=2, sort_keys=True)}
 
     Only give your response after all your queries are done.
     Your succinct output will be used by the details extractor agent to adjust their response and by the formatter agent to format the final response.
@@ -106,7 +111,8 @@ async def workflow_execution(workflow_text: str) -> str:
                 responses[-1] += f"{update.text}"
 
     if responses:
-        return "\n".join(responses)
+        joined = "\n".join(responses)
+        return joined
     else:
         return "Workflow didn't work."
 
@@ -114,6 +120,7 @@ async def workflow_execution(workflow_text: str) -> str:
 workflow_executor = Agent(
     client=client,
     name="SJ-Workflow-Executor-Agent",
+    default_options={"temperature": TEMPERATURE, "seed": SEED},
     tools=[workflow_execution],
     instructions=f"""
     You are the SJ Group Task Workflow Executor Agent.
@@ -125,7 +132,7 @@ workflow_executor = Agent(
     If you believe without a doubt that the detail agent has responded adequately to the change detection agent, or has preempted, don't call again.
     Err on giving too many chances to the agents instead of cutting them off too early.
     Your only response should be their conversation for the formatter agent to use,
-    whose job is to format the final response into the following schema for the database:  {json.dumps(TaskUpdate.model_json_schema(), indent=2)}.
+    whose job is to format the final response into the following schema for the database:  {json.dumps(TaskUpdate.model_json_schema(), indent=2, sort_keys=True)}.
     However, if there are no meaningful tasks (i.e, duplicates or completely no information), instruct the format agent to return an empty list.
     """
 )
@@ -133,6 +140,7 @@ workflow_executor = Agent(
 formatter_agent = Agent(
     client=client,
     name="SJ-Formatter-Agent",
+    default_options={"temperature": TEMPERATURE, "seed": SEED},
     instructions="""
     You are the SJ Group Task Formatter Agent.
     You must use your fellow agents previous responses to format the final output into the TaskUpdateList schema that the frontend expects, with the best values possible.
@@ -175,13 +183,16 @@ async def format_update(text: str, no_ai: bool = False) -> TaskUpdateList:
             ]
         )
 
-    workflow_executor_response = await workflow_executor.run(text, options={"response_format": WorkflowExecutionResponse})
-    print("\nWorkflow Executor Response:", workflow_executor_response.text)
+    workflow_executor_response_text = await workflow_execution(text)
+    print("\nWorkflow Executor Response:", workflow_executor_response_text)
+
+    formatter_prompt = f"""\nUser Input: {text}\n
+        \nDetails Extractor Agent and Change Detection Agent Discussion: \n{workflow_executor_response_text}
+        """
 
     formatter_response = await formatter_agent.run(
-        f"""User Input: {text}\n
-        Details Extractor Agent and Change Detection Agent Discussion: \n{workflow_executor_response.text}
-        """,
-        options={"response_format": TaskUpdateList}
+        formatter_prompt,
+        options={"response_format": TaskUpdateList,
+                 "temperature": TEMPERATURE, "seed": SEED}
     )
     return TaskUpdateList.model_validate(formatter_response.value)

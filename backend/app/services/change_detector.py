@@ -13,7 +13,7 @@ import json
 @tool(approval_mode="never_require", max_invocations=7)
 def query_existing_tasks(query_str: str):
     """Tool function to query the database. 
-    Must be one query that starts with SELECT. 
+    Must be one query string that starts with SELECT. 
     This can be used by the AI agent to compare against incoming task updates for change detection.
     All tables can be queried, including tasks, projects, people, dependencies."""
     if not query_str.strip().upper().startswith("SELECT"):
@@ -22,10 +22,23 @@ def query_existing_tasks(query_str: str):
     if ";" in query_str.strip().rstrip(";"):
         raise ValueError("Only one query at a time is allowed")
 
+    q = query_str.strip()
+    if "ORDER BY" not in q.upper():
+        q_upper = q.upper()
+        if " FROM TASKS" in q_upper:
+            q = f"{q} ORDER BY task_id"
+        elif " FROM PROJECTS" in q_upper:
+            q = f"{q} ORDER BY project_id"
+        elif " FROM PEOPLE" in q_upper:
+            q = f"{q} ORDER BY person_id"
+        elif " FROM DEPENDENCIES" in q_upper:
+            q = f"{q} ORDER BY dependency_id"
+
     with SessionLocal() as db:
-        result = db.execute(text(query_str)).mappings().all()
-    print(result)
-    return json.dumps(list(result), default=str)
+        result = db.execute(text(q)).mappings().all()
+    print(f"\nQuery: {query_str}")
+    print(f"\nResult: {result}")
+    return json.dumps(list(result), default=str, sort_keys=True)
 
 
 def detect_changes_batched(db: Session, task_updates: list[TaskUpdate]):

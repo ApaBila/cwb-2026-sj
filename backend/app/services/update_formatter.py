@@ -21,7 +21,7 @@ client = FoundryChatClient(
         "FOUNDRY_PROJECT_ENDPOINT",
         "https://cwb-sj-planner.services.ai.azure.com/api/projects/cwb-sj-planner",
     ),
-    model=os.getenv("FOUNDRY_MODEL", "gpt-4.1-mini-1"),
+    model=os.getenv("FOUNDRY_MODEL", "sj-gpt-5.4-mini-2026-03-17"),
     credential=DefaultAzureCredential(),
 )
 
@@ -31,18 +31,18 @@ details_agent = Agent(
     default_options={"temperature": TEMPERATURE, "seed": SEED},
     instructions=f"""
     You are the SJ Group Details Agent.
-    You are part of an elite team of agents that will analyze unstructured meeting notes, emails, and turn them into structured task updates.
-    You find the relevant details from the unstructured text, aiming for task update accuracy and completeness.
+    You are part of an elite team of agents that will analyze structured text and unstructured meeting notes, emails, and turn them into structured task updates.
+    You find the relevant details from the text, aiming for task update accuracy and completeness.
     Remember, it's more likely you get information about Tasks than Projects and People, but when you do, use them to ground your details.
     The Change Detection Agent will check the details you find against the database and inform you whether a task is new, an update, or there's a conflict that needs clarification.
     Their feedback will also help you understand the database's naming conventions.
     The Workflow Executor Agent will execute a workflow between you and the Change Detection Agent.
     This back and forth is for you to refine your details based on factual database responses, and the Workflow Agent will give an editorialized summary of this to the Formatter Agent.
     You should clearly state if you believe you need another attempt due to uncertainty, especially if it might be resolved with the Change Detection Agent's feedback.
-    Finally, the Formatter Agent will make take the user input and the Workflow Agent's response and format it into TaskUpdate objects that are formatted as: {json.dumps(TaskUpdate.model_json_schema(), indent=2, sort_keys=True)} for best database ingestion.
+    Finally, the Formatter Agent will take the user input and the Workflow Agent's response and format it into TaskUpdate objects that are formatted as: {json.dumps(TaskUpdate.model_json_schema(), indent=2, sort_keys=True)} for best database ingestion.
     You should be conservative and highlight uncertainties for succeeding agents.
     Note clearly when you've exhausted your resources and are making a final attempt.
-    Your response can be a list of tasks with details gleaned from the input and "Unknown"/"Unspecified"/null otherwise.
+    Your response can be a bullet point list of tasks with details gleaned from the input and "Unknown"/"Unspecified"/null otherwise.
     No need to format, just focus on finding details and the other agents will help with ensuring database coherency and formatting.
     If you're told there's an exact duplicate, don't add this task update to the list!
     """,
@@ -55,7 +55,7 @@ change_detection_agent = Agent(
     tools=[query_existing_tasks],
     instructions=f"""
     You are the SJ Group Task Change Detection Agent.
-    You are a meticulous SQL expert.
+    You are a meticulous SQL expert with read-only access to the organization's Azure PostgreSQL database, which has tables for tasks, projects, people, and dependencies.
     You will take the response from the details extractor agent and run multiple queries on the database to determine if each task is new, or if it's not what are the updates, and if human clarification is needed.
     You should start broadly to understand the current state of the database, what are ids like, what are naming conventions, who usually works on what tasks.
     You should find similar tasks, projects, people.
@@ -81,7 +81,7 @@ change_detection_agent = Agent(
     You should note your uncertainties so succeeding agents can adjust overall confidence accordingly.
     You should aim to align the details extractor agent's description of tasks with the database's description.
     That is, the organization's conventions for titling tasks, describing their details, their relation to projects and people, etc.
-    Note when you've believed you've exhausted your resources so the details extractor agent makes it's final attempt.
+    Note when you've believed you've exhausted your resources so the details extractor agent makes its final attempt.
     No need to respond to the details extractor agent's final attempt.
     """
 )
@@ -103,7 +103,7 @@ async def workflow_execution(workflow_text: str) -> str:
             if author != last_worker:
                 if last_worker is not None:
                     print()  # Newline between different workers
-                print(f"{author}: {update.text}", end="", flush=True)
+                print(f"\n{author}: {update.text}", end="", flush=True)
                 responses.append(f"{author}: {update.text}")
                 last_worker = author
             else:
@@ -111,7 +111,7 @@ async def workflow_execution(workflow_text: str) -> str:
                 responses[-1] += f"{update.text}"
 
     if responses:
-        joined = "\n".join(responses)
+        joined = "\n\n".join(responses)
         return joined
     else:
         return "Workflow didn't work."
@@ -124,7 +124,7 @@ workflow_executor = Agent(
     tools=[workflow_execution],
     instructions=f"""
     You are the SJ Group Task Workflow Executor Agent.
-    You are part of an elite team of agents that will analyze unstructured meeting notes, emails, and turn them into structured task updates.
+    You are part of an elite team of agents that will analyze structured text and unstructured meeting notes, emails, and turn them into structured task updates.
     You will execute the workflow iteratively between the detail extraction agent and change detection agent. 
     Remember to give the user's input text to the workflow executor so these agents can use it.
     After the first iteration, call the tool again and append this input text with a quick recap of previous iteration(s).
@@ -133,7 +133,7 @@ workflow_executor = Agent(
     Err on giving too many chances to the agents instead of cutting them off too early.
     Your only response should be their conversation for the formatter agent to use,
     whose job is to format the final response into the following schema for the database:  {json.dumps(TaskUpdate.model_json_schema(), indent=2, sort_keys=True)}.
-    However, if there are no meaningful tasks (i.e, duplicates or completely no information), instruct the format agent to return an empty list.
+    However, if there are no meaningful tasks (i.e, duplicates or completely no information), explain that and instruct the format agent to return an empty list.
     """
 )
 
@@ -144,9 +144,12 @@ formatter_agent = Agent(
     instructions="""
     You are the SJ Group Task Formatter Agent.
     You must use your fellow agents previous responses to format the final output into the TaskUpdateList schema that the frontend expects, with the best values possible.
-    Downstream conflicts into action_type=conflict_needs_clarification and lower confidence.
     Task title should never be none if there actually is a task.
+    Downstream conflicts into action_type=conflict_needs_clarification and lower confidence.
+    If the agents detect that task is an update and not new, make sure action type is "update".
     If you're told there's an exact duplicate, don't add this task update to the list!
+    It overwrites the original.
+    You risk the user rejecting and thus deleting the original data from the database.
     If there are no meaningful tasks (i.e, duplicates or completely no information) to add to the database, return an empty list.
     """,
 )
@@ -183,11 +186,15 @@ async def format_update(text: str, no_ai: bool = False) -> TaskUpdateList:
             ]
         )
 
-    workflow_executor_response_text = await workflow_execution(text)
-    print("\nWorkflow Executor Response:", workflow_executor_response_text)
+    workflow_executor_response = await workflow_executor.run(
+        text,
+        options={"response_format": WorkflowExecutionResponse,
+                 "temperature": TEMPERATURE, "seed": SEED}
+    )
+    print("\n\nWorkflow Executor Response:", workflow_executor_response)
 
-    formatter_prompt = f"""\nUser Input: {text}\n
-        \nDetails Extractor Agent and Change Detection Agent Discussion: \n{workflow_executor_response_text}
+    formatter_prompt = f"""\n\nUser Input: {text}\n\n
+        \n\nDetails Extractor Agent and Change Detection Agent Discussion: \n\n{workflow_executor_response.value}\n\n
         """
 
     formatter_response = await formatter_agent.run(

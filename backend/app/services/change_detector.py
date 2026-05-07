@@ -7,6 +7,20 @@ from app.database import SessionLocal
 from sqlalchemy import text
 import json
 
+from contextvars import ContextVar
+from typing import Any, Callable
+
+StreamEmit = Callable[[dict[str, Any]], None]
+stream_progress_emit: ContextVar[StreamEmit | None] = ContextVar(
+    "stream_progress_emit", default=None
+)
+
+
+def try_emit_progress(payload: dict[str, Any]) -> None:
+    fn = stream_progress_emit.get()
+    if fn is not None:
+        fn(payload)
+
 # https://github.com/Azure-Samples/postgres-agents/tree/main/azure-ai-agent-service
 
 
@@ -38,6 +52,13 @@ def query_existing_tasks(query_str: str):
         result = db.execute(text(q)).mappings().all()
     print(f"\nQuery: {query_str}")
     print(f"\nResult: {result}")
+    try_emit_progress(
+        {
+            "kind": "db",
+            "query": query_str.strip(),
+            "rows": len(result),
+        }
+    )
     return json.dumps(list(result), default=str, sort_keys=True)
 
 

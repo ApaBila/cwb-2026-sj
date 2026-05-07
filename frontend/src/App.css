@@ -116,6 +116,40 @@
     @apply disabled:pointer-events-none disabled:opacity-[0.55] disabled:cursor-not-allowed;
   }
 
+  /** Chat-style progress boxes. */
+  .sj-chat-row {
+    @apply flex w-full min-w-0;
+  }
+  .sj-chat-row--user {
+    @apply justify-end;
+  }
+
+  .sj-chat-box {
+    @apply inline-flex max-w-full min-w-0 flex-col items-start gap-1 border-2 border-sjblue p-4 text-white shadow-none rounded-lg;
+    @apply pointer-events-none;
+  }
+
+  .sj-chat-box--user {
+    @apply bg-white text-black text-right;
+  }
+
+  .sj-chat-box--status, .sj-chat-box--agent, .sj-chat-box--db {
+    @apply bg-sjblue text-white text-left;
+  }
+
+  .sj-chat-box--error {
+    @apply bg-sjred text-white border-sjred;
+  }
+
+  .sj-chat-title {
+    @apply font-semibold tracking-wide opacity-90 text-sj-body;
+  }
+
+  .sj-chat-body {
+    @apply font-normal whitespace-pre-wrap break-words text-sj-body;
+  }
+  /**/
+
   .confidence-high {
     @apply bg-black/20 text-white;
   }

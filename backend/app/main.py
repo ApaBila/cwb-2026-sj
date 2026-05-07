@@ -1,12 +1,15 @@
+import asyncio
+import json
 import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from .database import SessionLocal
 from .services.update_formatter import format_update
 from .schemas import UpdateRequest
 from openai import APIStatusError
-from .services.change_detector import detect_changes_batched
+from .services.change_detector import detect_changes_batched, stream_progress_emit
 from sqlalchemy import text, or_
 from .schemas import CommitUpdate
 from .models import Task, Dependency
@@ -66,6 +69,77 @@ async def post_drafts(request_text: UpdateRequest):
         detect_changes_batched(db, ai_response.tasks)  # type: ignore
 
     return ai_response.model_dump(mode='json')  # type: ignore
+
+
+def _encode_sse(event_name: str, data: dict) -> bytes:
+    return (
+        f"event: {event_name}\n"
+        f"data: {json.dumps(data, default=str)}\n\n"
+    ).encode("utf-8")
+
+
+@app.post("/api/drafts/create/stream")
+async def post_drafts_stream(request_text: UpdateRequest):
+    """Same outcome as POST /api/drafts/create, but streams SSE progress events."""
+
+    queue: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+
+    def emit_progress(payload: dict) -> None:
+        def put() -> None:
+            try:
+                queue.put_nowait(("progress", payload))
+            except Exception:
+                pass
+
+        loop.call_soon_threadsafe(put)
+
+    async def event_gen():
+        async def worker() -> None:
+            token = stream_progress_emit.set(emit_progress)
+            try:
+                emit_progress({"kind": "status", "phase": "starting"})
+                user_text = request_text.user_text
+                no_ai = os.getenv("SJ_NO_AI", "").strip(
+                ).lower() in ("1", "true", "yes")
+                emit_progress({"kind": "status", "phase": "formatting"})
+                ai_response = await format_update(user_text, no_ai=no_ai)
+                emit_progress({"kind": "status", "phase": "writing_drafts"})
+                with SessionLocal() as db:
+                    detect_changes_batched(db, ai_response.tasks)  # type: ignore
+                emit_progress({"kind": "status", "phase": "done"})
+                dump = ai_response.model_dump(mode="json")  # type: ignore
+                await queue.put(("final", dump))
+            except APIStatusError as e:
+                await queue.put(("error", {"detail": e.message}))
+            except Exception as e:
+                await queue.put(("error", {"detail": str(e)}))
+            finally:
+                stream_progress_emit.reset(token)
+                await queue.put(("end", None))
+
+        asyncio.create_task(worker())
+        while True:
+            kind, data = await queue.get()
+            if kind == "progress":
+                yield _encode_sse("progress", data)
+            elif kind == "final":
+                yield _encode_sse("final", data)
+            elif kind == "error":
+                yield _encode_sse("error", data)
+                break
+            elif kind == "end":
+                break
+
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.get("/api/drafts")

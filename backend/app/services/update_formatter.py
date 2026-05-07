@@ -5,7 +5,7 @@ from agent_framework.foundry import FoundryChatClient
 from azure.identity import DefaultAzureCredential
 
 from app.schemas import TaskUpdateList, TaskUpdate, WorkflowExecutionResponse
-from app.services.change_detector import query_existing_tasks
+from app.services.change_detector import query_existing_tasks, try_emit_progress
 
 import json
 from agent_framework import tool
@@ -94,21 +94,38 @@ workflow = WorkflowBuilder(start_executor=details_agent).add_edge(
 async def workflow_execution(workflow_text: str) -> str:
     print("Input:", workflow_text)
     last_worker: str | None = None
+    segment_text: str = ""
     events = workflow.run(workflow_text, stream=True)
     responses = []
     async for event in events:
         if event.type == "output" and isinstance(event.data, AgentResponseUpdate):
             update = event.data
             author = update.author_name
+            chunk = update.text or ""
             if author != last_worker:
+                if last_worker is not None and segment_text:
+                    try_emit_progress(
+                        {
+                            "kind": "agent",
+                            "author": last_worker,
+                            "text": segment_text,
+                        }
+                    )
                 if last_worker is not None:
                     print()  # Newline between different workers
-                print(f"\n{author}: {update.text}", end="", flush=True)
-                responses.append(f"{author}: {update.text}")
+                print(f"\n{author}: {chunk}", end="", flush=True)
+                responses.append(f"{author}: {chunk}")
                 last_worker = author
+                segment_text = chunk
             else:
-                print(update.text, end="", flush=True)
-                responses[-1] += f"{update.text}"
+                print(chunk, end="", flush=True)
+                responses[-1] += chunk
+                segment_text += chunk
+
+    if last_worker is not None and segment_text:
+        try_emit_progress(
+            {"kind": "agent", "author": last_worker, "text": segment_text}
+        )
 
     if responses:
         joined = "\n\n".join(responses)

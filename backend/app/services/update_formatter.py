@@ -1,5 +1,6 @@
 import os
 import uuid
+from contextvars import ContextVar
 from agent_framework import Agent, AgentResponseUpdate, WorkflowBuilder
 from agent_framework.foundry import FoundryChatClient
 from azure.identity import DefaultAzureCredential
@@ -33,6 +34,7 @@ details_agent = Agent(
     You are the SJ Group Details Agent.
     You are part of an elite team of agents that will analyze structured text and unstructured meeting notes, emails, and turn them into structured task updates.
     You find the relevant details from the text, aiming for task update accuracy and completeness.
+    When the input contains repeated blocks like "--- Task <id> ---" with lines "field_name: value", treat each block as one task and extract every listed field (do not assume the body is only a summary).
     Remember, it's more likely you get information about Tasks than Projects and People, but when you do, use them to ground your details.
     The Change Detection Agent will check the details you find against the database and inform you whether a task is new, an update, or there's a conflict that needs clarification.
     Their feedback will also help you understand the database's naming conventions.
@@ -89,10 +91,35 @@ change_detection_agent = Agent(
 workflow = WorkflowBuilder(start_executor=details_agent).add_edge(
     details_agent, change_detection_agent).build()
 
+# Full verbatim user submission for the current format_update call. The workflow
+# executor LLM must not be relied on to repeat bulk text into tool calls (it often
+# summarizes, which breaks bulk Gantt/edit flows). workflow.run() always sees this
+# string, optionally with short executor notes appended for later iterations.
+_workflow_full_user_input: ContextVar[str | None] = ContextVar(
+    "_workflow_full_user_input", default=None
+)
+
 
 @tool(approval_mode="never_require", max_invocations=7)
-async def workflow_execution(workflow_text: str) -> str:
-    print("Input:", workflow_text)
+async def workflow_execution(prior_iteration_notes: str = "") -> str:
+    full_user = _workflow_full_user_input.get() or ""
+    notes = (prior_iteration_notes or "").strip()
+    if notes:
+        workflow_text = (
+            f"{full_user}\n\n"
+            f"--- Workflow executor notes (follow-up iteration) ---\n"
+            f"{notes}"
+        )
+    else:
+        workflow_text = full_user
+    print(
+        "workflow.run input: full_user_chars=",
+        len(full_user),
+        "notes_chars=",
+        len(notes),
+        "total_chars=",
+        len(workflow_text),
+    )
     last_worker: str | None = None
     segment_text: str = ""
     events = workflow.run(workflow_text, stream=True)
@@ -142,9 +169,13 @@ workflow_executor = Agent(
     instructions=f"""
     You are the SJ Group Task Workflow Executor Agent.
     You are part of an elite team of agents that will analyze structured text and unstructured meeting notes, emails, and turn them into structured task updates.
-    You will execute the workflow iteratively between the detail extraction agent and change detection agent. 
-    Remember to give the user's input text to the workflow executor so these agents can use it.
-    After the first iteration, call the tool again and append this input text with a quick recap of previous iteration(s).
+    You will execute the workflow iteratively between the detail extraction agent and change detection agent.
+
+    CRITICAL: The user's full submission (including very large bulk task lists from the Gantt chart) is injected by the server into every workflow run.
+    Do NOT try to paste, summarize, or paraphrase the user's task data into the tool call — that caused loss of task fields in production.
+    Call the workflow_execution tool with NO arguments (or an empty string) for the first iteration so the details and change-detection agents receive the complete user text.
+    On later iterations ONLY, pass prior_iteration_notes: a short summary of what still needs resolving between agents (not the full user input).
+
     Iterate until there's no new info to give to either agent.
     If you believe without a doubt that the detail agent has responded adequately to the change detection agent, or has preempted, don't call again.
     Err on giving too many chances to the agents instead of cutting them off too early.
@@ -203,11 +234,15 @@ async def format_update(text: str, no_ai: bool = False) -> TaskUpdateList:
             ]
         )
 
-    workflow_executor_response = await workflow_executor.run(
-        text,
-        options={"response_format": WorkflowExecutionResponse,
-                 "temperature": TEMPERATURE, "seed": SEED}
-    )
+    token = _workflow_full_user_input.set(text)
+    try:
+        workflow_executor_response = await workflow_executor.run(
+            text,
+            options={"response_format": WorkflowExecutionResponse,
+                     "temperature": TEMPERATURE, "seed": SEED}
+        )
+    finally:
+        _workflow_full_user_input.reset(token)
     print("\n\nWorkflow Executor Response:", workflow_executor_response)
 
     formatter_prompt = f"""\n\nUser Input: {text}\n\n

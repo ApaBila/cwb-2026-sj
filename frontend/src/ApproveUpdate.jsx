@@ -2,10 +2,13 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Spinner, Button } from 'flowbite-react'
 import DraftsDataTable from './DraftsDataTable'
 
+// Key must match Gantt.jsx (bulk edit prefill from View page).
+const EDIT_PREFILL_STORAGE_KEY = 'sj-edit-prefill-v1'
+
 // Visual playback controls for streamed progress.
 // Increase these to slow down the appearance of boxes for review/tweaking.
-const STREAM_BOX_DELAY_MS = 6_000
-const STREAM_AFTER_ALL_DELAY_MS = 60_000
+const STREAM_BOX_DELAY_MS = 1_000
+const STREAM_AFTER_ALL_DELAY_MS = 1_000
 
 /** One streamed SSE payload rendered as a chat-style box (see App.css). */
 function StreamBubble({ event: ev }) {
@@ -70,12 +73,24 @@ function StreamBubble({ event: ev }) {
 }
 
 function SubmitUpdate({ apiBaseUrl, refreshDrafts, onStreamingChange }) {
-  const [message, setMessage] = useState('')
+  const [message, setMessage] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem(EDIT_PREFILL_STORAGE_KEY)
+      if (raw != null && raw !== '') {
+        sessionStorage.removeItem(EDIT_PREFILL_STORAGE_KEY)
+        return raw
+      }
+    } catch {
+      /* ignore quota / private mode */
+    }
+    return ''
+  })
   const [phase, setPhase] = useState('idle')
   const [streamEvents, setStreamEvents] = useState([])
   const [submitError, setSubmitError] = useState('')
   const abortRef = useRef(null)
   const lastBoxRef = useRef(null)
+  const streamViewportRef = useRef(null)
   const playbackRef = useRef({
     queue: [],
     processing: false,

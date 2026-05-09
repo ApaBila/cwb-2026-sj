@@ -70,6 +70,31 @@ function sortByDraftDate(which) {
   };
 }
 
+/** Shared checkbox column for drafts and unscheduled grids (TanStack Table meta). */
+const SELECT_COLUMN = {
+  id: '_select',
+  header: () => (
+    <span className="flex w-full flex-col items-center justify-center font-sans text-sj-body font-semibold leading-tight text-black">
+      Select All
+    </span>
+  ),
+  enableSorting: false,
+  enableColumnFilter: false,
+  cell: ({ row, table }) => {
+    const meta = table.options.meta ?? {};
+    const { selectedIds = new Set(), onToggle } = meta;
+    const id = row.original.task_id;
+    return (
+      <div className="flex items-center justify-center">
+        <Checkbox
+          checked={selectedIds.has(id)}
+          onChange={() => onToggle?.(id)}
+        />
+      </div>
+    );
+  },
+};
+
 /** Subset aligned with Gantt frozen columns (Project / Task / Owner). */
 const UNSCHEDULED_COLUMNS = [
   {
@@ -99,6 +124,7 @@ const UNSCHEDULED_COLUMNS = [
     filterFn: includesTextFilter,
     sortingFn: 'alphanumeric',
   },
+  SELECT_COLUMN,
 ];
 
 const FULL_COLUMNS = [
@@ -203,29 +229,7 @@ const FULL_COLUMNS = [
     filterFn: includesTextFilter,
     sortingFn: sortByOrdinalMap(CONFIDENCE_SORT_ORDER),
   },
-  {
-    id: '_select',
-    header: () => (
-      <span className="flex w-full flex-col items-center justify-center font-sans text-sj-body font-semibold leading-tight text-black">
-        Select All
-      </span>
-    ),
-    enableSorting: false,
-    enableColumnFilter: false,
-    cell: ({ row, table }) => {
-      const meta = table.options.meta ?? {};
-      const { selectedIds = new Set(), onToggle } = meta;
-      const id = row.original.task_id;
-      return (
-        <div className="flex items-center justify-center">
-          <Checkbox
-            checked={selectedIds.has(id)}
-            onChange={() => onToggle?.(id)}
-          />
-        </div>
-      );
-    },
-  },
+  SELECT_COLUMN,
 ];
 
 /**
@@ -233,7 +237,7 @@ const FULL_COLUMNS = [
  * narrows — the outer wrapper scrolls horizontally instead. Sum of col widths.
  */
 const DRAFTS_TABLE_MIN_WIDTH_PX = 1180;
-const UNSCHEDULED_TABLE_MIN_WIDTH_PX = 520;
+const UNSCHEDULED_TABLE_MIN_WIDTH_PX = 592;
 
 /** `table-layout: fixed` column widths (px). Order matches `columns`. */
 const DRAFTS_COLGROUP = (
@@ -258,6 +262,7 @@ const UNSCHEDULED_COLGROUP = (
     <col style={{ width: 120 }} />
     <col style={{ width: 280 }} />
     <col style={{ width: 120 }} />
+    <col style={{ width: 72 }} />
   </colgroup>
 );
 

@@ -46,8 +46,14 @@ class TaskUpdateList(BaseModel):
 
 class UpdateRequest(BaseModel):
     user_text: str = Field()
-    no_ai: bool = Field(
-        default=False, description="Set True for dev mode, no AI to save Azure credits")
+
+
+class WorkflowExecutionResponse(BaseModel):
+    turns: int
+    # key_findings: str = Field(
+    #     description="Key findings include: unknowns and uncertainties that the detail extractor agent found, change detection agent's help with those and anything else, and finally how the details agent changed their answer based on the change detection agent's feedback for that issue.")
+    concise_chat: List[str] = Field(
+        description="""Replay the conversation between the detail extractor agent and change detection agent but edit to keep short,  simple, and clear. Use this format: \nTurn {#}: {agent_name}: {their response}""")
 
 
 class CommitUpdate(BaseModel):

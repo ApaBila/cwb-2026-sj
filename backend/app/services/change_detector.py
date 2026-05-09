@@ -1,18 +1,33 @@
 import uuid
 from sqlalchemy.orm import Session
-from ..models import Task, Project, Person, Dependency
+from ..models import Task, Project, Person
 from ..schemas import TaskUpdate
 from agent_framework import tool
 from app.database import SessionLocal
 from sqlalchemy import text
+import json
+
+from contextvars import ContextVar
+from typing import Any, Callable
+
+StreamEmit = Callable[[dict[str, Any]], None]
+stream_progress_emit: ContextVar[StreamEmit | None] = ContextVar(
+    "stream_progress_emit", default=None
+)
+
+
+def try_emit_progress(payload: dict[str, Any]) -> None:
+    fn = stream_progress_emit.get()
+    if fn is not None:
+        fn(payload)
 
 # https://github.com/Azure-Samples/postgres-agents/tree/main/azure-ai-agent-service
 
 
-@tool(approval_mode="never_require")
+@tool(approval_mode="never_require", max_invocations=7)
 def query_existing_tasks(query_str: str):
     """Tool function to query the database. 
-    Must be one query that starts with SELECT. 
+    Must be one query string that starts with SELECT. 
     This can be used by the AI agent to compare against incoming task updates for change detection.
     All tables can be queried, including tasks, projects, people, dependencies."""
     if not query_str.strip().upper().startswith("SELECT"):
@@ -21,18 +36,37 @@ def query_existing_tasks(query_str: str):
     if ";" in query_str.strip().rstrip(";"):
         raise ValueError("Only one query at a time is allowed")
 
+    q = query_str.strip()
+    if "ORDER BY" not in q.upper():
+        q_upper = q.upper()
+        if " FROM TASKS" in q_upper:
+            q = f"{q} ORDER BY task_id"
+        elif " FROM PROJECTS" in q_upper:
+            q = f"{q} ORDER BY project_id"
+        elif " FROM PEOPLE" in q_upper:
+            q = f"{q} ORDER BY person_id"
+        elif " FROM DEPENDENCIES" in q_upper:
+            q = f"{q} ORDER BY dependency_id"
+
     with SessionLocal() as db:
-        result = db.execute(text(query_str)).all()
-    print(result)
-    return result
+        result = db.execute(text(q)).mappings().all()
+    print(f"\nQuery: {query_str}")
+    print(f"\nResult: {result}")
+    try_emit_progress(
+        {
+            "kind": "db",
+            "query": query_str.strip(),
+            "rows": len(result),
+        }
+    )
+    return json.dumps(list(result), default=str, sort_keys=True)
 
 
 def detect_changes_batched(db: Session, task_updates: list[TaskUpdate]):
     """Detects if the tasks caught by the AI are new, updates, or require clarification due to conflicts 
     based on the existing task data in Azure's PostgreSQL database. 
     Also validates that referenced projects, people exist.
-    Adds the tasks from the AI with the appropriate action type and approval set to False for the frontend 
-    to display and allow the user to approve or reject.
+    Inserts new tasks or updates existing rows as unapproved tasks (drafts).
     Prints to terminal of uvicorn for debugging purposes."""
     if not task_updates:
         return
@@ -62,7 +96,8 @@ def detect_changes_batched(db: Session, task_updates: list[TaskUpdate]):
         Person.person_id.in_(owner_ids)).all() if owner_ids else []
     existing_person_map = {p.person_id: p for p in existing_people}
 
-    update_drafts = []
+    pending_rows: list[dict] = []
+    task_columns = {c.key for c in Task.__table__.columns}
 
     for task_update in task_updates:
         print("Detecting changes for task:", task_update.task_title)
@@ -77,16 +112,16 @@ def detect_changes_batched(db: Session, task_updates: list[TaskUpdate]):
         person_exists = task_update.owner_id in existing_person_map if task_update.owner_id else True
         entities_valid = project_exists and person_exists
 
-        if existing_task:
-            if task_update.action_type in ["new_task", "conflict_needs_clarification"]:
-                final_action = "conflict_needs_clarification"
-            else:
-                final_action = "update"
-        else:
-            if task_update.action_type in ["update", "conflict_needs_clarification"]:
-                final_action = "conflict_needs_clarification"
-            else:
-                final_action = "new_task"
+        # if existing_task:
+        #     if task_update.action_type in ["new_task", "conflict_needs_clarification"]:
+        #         final_action = "conflict_needs_clarification"
+        #     else:
+        #         final_action = "update"
+        # else:
+        #     if task_update.action_type in ["update", "conflict_needs_clarification"]:
+        #         final_action = "conflict_needs_clarification"
+        #     else:
+        #         final_action = "new_task"
 
         # If referenced entities are missing, escalate to conflict
         if not entities_valid:
@@ -94,7 +129,7 @@ def detect_changes_batched(db: Session, task_updates: list[TaskUpdate]):
                 f"Referenced entities missing: project_exists={project_exists}, person_exists={person_exists}")
             final_action = "conflict_needs_clarification"
 
-        print(f"Final action: {final_action}")
+        # print(f"Final action: {final_action}")
 
         try:
             task_data = extract_task_data(task_update)
@@ -104,22 +139,37 @@ def detect_changes_batched(db: Session, task_updates: list[TaskUpdate]):
                 task_data["task_id"] = f"DRAFT_{uuid.uuid4().hex[:8].upper()}"
                 print(f"Generated new task_id: {task_data['task_id']}")
 
-            update_draft = Task(**task_data)
-            update_draft.action_type = final_action  # type: ignore
-            update_draft.is_approved = False  # type: ignore
-
-            update_drafts.append(update_draft)
+            # task_data["action_type"] = final_action
+            task_data["is_approved"] = False
+            pending_rows.append(task_data)
         except Exception as e:
             print(
-                f"Error creating task draft for '{task_update.task_title}': {e}")
+                f"Error formatting draft for '{task_update.task_title}': {e}")
             continue
 
-    if update_drafts:
-        try:
-            db.add_all(update_drafts)
-            db.commit()
-            print(f"Successfully committed {len(update_drafts)} task drafts.")
-        except Exception as e:
-            db.rollback()
-            print(f"Error committing task drafts: {e}")
-            raise
+    if not pending_rows:
+        return
+
+    task_ids = [row["task_id"] for row in pending_rows]
+    existing_by_id = {
+        t.task_id: t
+        for t in db.query(Task).filter(Task.task_id.in_(task_ids)).all()
+    }
+
+    for task_data in pending_rows:
+        filtered = {k: v for k, v in task_data.items() if k in task_columns}
+        tid = filtered["task_id"]
+        if tid in existing_by_id:
+            row = existing_by_id[tid]
+            for key, value in filtered.items():
+                setattr(row, key, value)
+        else:
+            db.add(Task(**filtered))
+
+    try:
+        db.commit()
+        print(f"Successfully committed {len(pending_rows)} task drafts.")
+    except Exception as e:
+        db.rollback()
+        print(f"Error committing task drafts: {e}")
+        raise

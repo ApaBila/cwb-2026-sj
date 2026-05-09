@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useState, useMemo, useRef, useCallback } from 'react';
-import { Button, Card, Dropdown, DropdownItem, Spinner } from 'flowbite-react';
+import { useNavigate } from 'react-router-dom';
+import { Button, Card, Checkbox, Dropdown, DropdownItem, Spinner } from 'flowbite-react';
 import date_utils from './utils/date_utils';
 import {
   DEFAULT_VIEW_MODES,
@@ -16,8 +17,11 @@ import { sortTasksForGanttLayout } from './utils/gantt_task_order';
 import { ganttDependencyPathD } from './utils/gantt_dependency_path';
 import DraftsDataTable from './DraftsDataTable';
 
-/** Width of sticky identifier column (px). */
-const FROZEN_PANEL_WIDTH = 252;
+/** Session key for bulk-edit prefill consumed by SubmitUpdate (must match ApproveUpdate.jsx). */
+const EDIT_PREFILL_STORAGE_KEY = 'sj-edit-prefill-v1';
+
+/** Width of sticky identifier column (px): checkbox + Project / Task / Owner. */
+const FROZEN_PANEL_WIDTH = 296;
 
 /** Same filter semantics as DraftsDataTable (includesTextFilter). */
 function cellIncludesFilter(value, filterRaw) {
@@ -29,9 +33,10 @@ function cellIncludesFilter(value, filterRaw) {
 
 const FROZEN_COLGROUP = (
   <colgroup>
-    <col style={{ width: '26%' }} />
-    <col style={{ width: '48%' }} />
-    <col style={{ width: '26%' }} />
+    <col style={{ width: 44 }} />
+    <col style={{ width: '24%' }} />
+    <col style={{ width: '40%' }} />
+    <col style={{ width: '22%' }} />
   </colgroup>
 );
 
@@ -90,12 +95,83 @@ function predSuccDetails(bar, bars) {
   return { preds, succs };
 }
 
+/** Layout-only keys from Gantt bar rows (not persisted task fields). */
+const LAYOUT_KEYS = new Set(['x', 'y', 'w', 'index']);
+
+/** Stable column order for human-readable edit blocks (matches Task model + dependencies). */
+const TASK_EDIT_FIELD_ORDER = [
+  'task_id',
+  'task_title',
+  'source_date_iso',
+  'project_id',
+  'owner_id',
+  'owner_name',
+  'start_date_raw',
+  'planned_start',
+  'due_date_raw',
+  'planned_due',
+  'status',
+  'dependency',
+  'percent_complete',
+  'priority',
+  'source',
+  'confidence',
+  'action_type',
+  'is_approved',
+  'dependencies',
+];
+
+function formatEditFieldValue(value) {
+  if (value === null || value === undefined) return '—';
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? '—' : date_utils.format(value, 'YYYY-MM-DD');
+  }
+  if (Array.isArray(value)) {
+    return value.length ? value.join(', ') : '—';
+  }
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  return String(value);
+}
+
+/**
+ * Builds a hand-written-form style blob for the Update page textarea (not JSON).
+ * @param {Record<string, unknown>[]} tasks
+ */
+function formatTasksAsEditPrefill(tasks) {
+  const sorted = [...tasks].sort((a, b) =>
+    String(a.task_id ?? '').localeCompare(String(b.task_id ?? '')),
+  );
+  const blocks = [];
+  for (const raw of sorted) {
+    const row = { ...raw };
+    LAYOUT_KEYS.forEach((k) => {
+      delete row[k];
+    });
+    const lines = [`--- Task ${row.task_id ?? '—'} ---`];
+    for (const key of TASK_EDIT_FIELD_ORDER) {
+      if (!Object.prototype.hasOwnProperty.call(row, key)) continue;
+      lines.push(`${key}: ${formatEditFieldValue(row[key])}`);
+    }
+    for (const key of Object.keys(row).sort()) {
+      if (TASK_EDIT_FIELD_ORDER.includes(key)) continue;
+      lines.push(`${key}: ${formatEditFieldValue(row[key])}`);
+    }
+    blocks.push(lines.join('\n'));
+  }
+  return blocks.join('\n\n');
+}
+
 function Gantt() {
+  const navigate = useNavigate();
   const [tasks, setTasks] = useState([]);
   const [unscheduledTasks, setUnscheduledTasks] = useState([]);
   const [draftsCount, setDraftsCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState(DEFAULT_VIEW_MODES[0].name);
+  /** Selected rows in unscheduled DraftsDataTable (task_id). */
+  const [selectedUnscheduledIds, setSelectedUnscheduledIds] = useState(() => new Set());
+  /** Selected rows in Gantt frozen column (filtered scheduled tasks only). */
+  const [selectedGanttIds, setSelectedGanttIds] = useState(() => new Set());
   /** Bar under pointer (cleared on mouse leave unless a bar is pinned). */
   const [hoveredBar, setHoveredBar] = useState(null);
   /** Pinned bar id: tooltip stays open until click-away or toggle. */
@@ -115,8 +191,6 @@ function Gantt() {
   /** Scroll-to-task implementation (ref avoids eslint ref-in-render on JSX handlers). */
   const scrollToBarByIdRef = useRef(() => {});
   const tooltipWidth = 320;
-
-  const emptySelection = useMemo(() => new Set(), []);
 
   const apiBaseUrl = import.meta.env.DEV ? 'http://localhost:8000' : '';
 
@@ -173,6 +247,82 @@ function Gantt() {
       return true;
     });
   }, [tasks, columnFilters]);
+
+  /** Filtered scheduled task ids (same row set as Gantt bars when layout exists). */
+  const filteredScheduledTaskIds = useMemo(
+    () => filteredTasks.map((t) => t.task_id).filter(Boolean),
+    [filteredTasks],
+  );
+
+  const allFilteredGanttSelected =
+    filteredScheduledTaskIds.length > 0 &&
+    filteredScheduledTaskIds.every((id) => selectedGanttIds.has(id));
+
+  const toggleUnscheduledSelection = useCallback((taskId) => {
+    setSelectedUnscheduledIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAllUnscheduledFiltered = useCallback((ids) => {
+    if (!ids.length) return;
+    setSelectedUnscheduledIds((prev) => {
+      const next = new Set(prev);
+      const allSelected = ids.every((id) => next.has(id));
+      if (allSelected) ids.forEach((id) => next.delete(id));
+      else ids.forEach((id) => next.add(id));
+      return next;
+    });
+  }, []);
+
+  const toggleGanttSelection = useCallback((taskId) => {
+    setSelectedGanttIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAllGanttFiltered = useCallback((ids) => {
+    if (!ids.length) return;
+    setSelectedGanttIds((prev) => {
+      const next = new Set(prev);
+      const allSelected = ids.every((id) => next.has(id));
+      if (allSelected) ids.forEach((id) => next.delete(id));
+      else ids.forEach((id) => next.add(id));
+      return next;
+    });
+  }, []);
+
+  const handleEditUnscheduled = useCallback(() => {
+    const list = unscheduledTasks.filter((t) => selectedUnscheduledIds.has(t.task_id));
+    if (!list.length) return;
+    const text = formatTasksAsEditPrefill(list);
+    try {
+      sessionStorage.setItem(EDIT_PREFILL_STORAGE_KEY, text);
+    } catch (e) {
+      console.error('Prefill storage failed', e);
+      return;
+    }
+    navigate('/');
+  }, [unscheduledTasks, selectedUnscheduledIds, navigate]);
+
+  const handleEditGantt = useCallback(() => {
+    const list = filteredTasks.filter((t) => selectedGanttIds.has(t.task_id));
+    if (!list.length) return;
+    const text = formatTasksAsEditPrefill(list);
+    try {
+      sessionStorage.setItem(EDIT_PREFILL_STORAGE_KEY, text);
+    } catch (e) {
+      console.error('Prefill storage failed', e);
+      return;
+    }
+    navigate('/');
+  }, [filteredTasks, selectedGanttIds, navigate]);
 
   const hasFilters = Object.values(columnFilters).some((v) => v && String(v).trim() !== '');
 
@@ -434,7 +584,19 @@ function Gantt() {
         }`}
         aria-label="Unscheduled Tasks"
       >
-        <h2 className="sj-text-h2 m-0 shrink-0 font-semibold text-black">Unscheduled Tasks</h2>
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
+          <h2 className="sj-text-h2 m-0 font-semibold text-black">Unscheduled Tasks</h2>
+          <Button
+            pill
+            size="xl"
+            type="button"
+            className="sj-action-pill"
+            disabled={selectedUnscheduledIds.size === 0}
+            onClick={handleEditUnscheduled}
+          >
+            Edit selected
+          </Button>
+        </div>
         <div
           className={
             unscheduledTall
@@ -447,9 +609,9 @@ function Gantt() {
           layout="embedded"
           embeddedFillViewport={unscheduledTall}
           drafts={unscheduledTasks}
-          selectedIds={emptySelection}
-          onToggle={() => {}}
-          onToggleAllFiltered={() => {}}
+          selectedIds={selectedUnscheduledIds}
+          onToggle={toggleUnscheduledSelection}
+          onToggleAllFiltered={toggleSelectAllUnscheduledFiltered}
         />
         </div>
       </section>
@@ -472,6 +634,16 @@ function Gantt() {
             ))}
           </Dropdown>
           <Button pill size="xl" onClick={() => refreshData()}>Refresh</Button>
+          <Button
+            pill
+            size="xl"
+            type="button"
+            className="sj-action-pill"
+            disabled={selectedGanttIds.size === 0}
+            onClick={handleEditGantt}
+          >
+            Edit selected
+          </Button>
           {hasFilters && (
             <button
               type="button"
@@ -530,6 +702,14 @@ function Gantt() {
                   <thead className="bg-black/10 text-black">
                     <tr>
                       <th
+                        className={`${thLabelClass} box-border align-middle text-center`}
+                        style={{ height: GANTT_HEADER_ROW1_PX, boxSizing: 'border-box' }}
+                      >
+                        <span className="flex w-full flex-col items-center justify-center font-sans text-sj-body font-semibold leading-tight text-black">
+                          Select All
+                        </span>
+                      </th>
+                      <th
                         className={`${thLabelClass} box-border`}
                         style={{ height: GANTT_HEADER_ROW1_PX, boxSizing: 'border-box' }}
                       >
@@ -549,6 +729,18 @@ function Gantt() {
                       </th>
                     </tr>
                     <tr>
+                      <th
+                        className={`${thFilterClass} box-border align-middle text-center`}
+                        style={{ height: GANTT_HEADER_ROW2_PX, boxSizing: 'border-box' }}
+                      >
+                        <div className="flex items-center justify-center py-0.5">
+                          <Checkbox
+                            aria-label="Select all visible scheduled tasks"
+                            checked={allFilteredGanttSelected}
+                            onChange={() => toggleSelectAllGanttFiltered(filteredScheduledTaskIds)}
+                          />
+                        </div>
+                      </th>
                       <th
                         className={`${thFilterClass} box-border`}
                         style={{ height: GANTT_HEADER_ROW2_PX, boxSizing: 'border-box' }}
@@ -669,6 +861,15 @@ function Gantt() {
                         className={trCls}
                         style={{ height: layout.rowHeight }}
                       >
+                        <td className="px-2 py-2 align-middle text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center">
+                            <Checkbox
+                              aria-label={`Select task ${b.task_id}`}
+                              checked={selectedGanttIds.has(b.task_id)}
+                              onChange={() => toggleGanttSelection(b.task_id)}
+                            />
+                          </div>
+                        </td>
                         <td className="px-2 py-2 align-middle whitespace-nowrap">
                           {b.project_id || '—'}
                         </td>

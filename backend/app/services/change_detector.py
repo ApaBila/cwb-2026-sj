@@ -1,14 +1,15 @@
-import uuid
-from sqlalchemy.orm import Session
-from ..models import Task, Project, Person
-from ..schemas import TaskUpdate
-from agent_framework import tool
-from app.database import SessionLocal
-from sqlalchemy import text
-import json
-
 from contextvars import ContextVar
+import json
 from typing import Any, Callable
+import uuid
+
+from agent_framework import tool
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from app.database import SessionLocal
+from app.models import Person, Project, Task
+from app.schemas import TaskUpdate
 
 StreamEmit = Callable[[dict[str, Any]], None]
 stream_progress_emit: ContextVar[StreamEmit | None] = ContextVar(

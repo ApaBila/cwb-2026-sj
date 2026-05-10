@@ -1,4 +1,4 @@
-from app.database import engine, Base
+from app.database import Base, engine
 
 print("Connecting to Azure PostgreSQL...")
 

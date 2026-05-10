@@ -1,24 +1,24 @@
 import asyncio
+from datetime import date
 import json
 import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from .database import SessionLocal
-from .services.update_formatter import format_update
-from .schemas import UpdateRequest
 from openai import APIStatusError
+from sqlalchemy import or_, text
+
+from .database import SessionLocal
+from .models import Dependency, Task
+from .schemas import CommitUpdate, UpdateRequest
 from .services.change_detector import (
     clear_stream_progress_fallback,
     detect_changes_batched,
     set_stream_progress_fallback,
     stream_progress_emit,
 )
-from sqlalchemy import text, or_
-from .schemas import CommitUpdate
-from .models import Task, Dependency
-from datetime import date
+from .services.update_formatter import format_update
 
 app = FastAPI(title="SJ Project Planner API")
 app.add_middleware(

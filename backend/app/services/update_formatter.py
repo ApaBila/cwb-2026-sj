@@ -1,16 +1,21 @@
+from contextvars import ContextVar
+import json
 import os
 import uuid
-from contextvars import ContextVar
-from agent_framework import Agent, AgentResponse, AgentResponseUpdate, WorkflowBuilder
+
+from agent_framework import (
+    Agent,
+    AgentResponse,
+    AgentResponseUpdate,
+    WorkflowBuilder,
+    tool,
+)
 from agent_framework.foundry import FoundryChatClient
 from azure.identity import DefaultAzureCredential
 
-from app.schemas import TaskUpdateList, TaskUpdate, WorkflowExecutionResponse
+from app.models import Dependency, Person, Project, Task
+from app.schemas import TaskUpdate, TaskUpdateList, WorkflowExecutionResponse
 from app.services.change_detector import query_existing_tasks, try_emit_progress
-
-import json
-from agent_framework import tool
-from app.models import Task, Project, Person, Dependency
 
 # https://github.com/microsoft/agent-framework/blob/main/python/samples/03-workflows/agents/azure_ai_agents_streaming.py
 

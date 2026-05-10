@@ -132,9 +132,9 @@ function StreamBubble({ event: ev }) {
     return (
       <div className="sj-chat-row">
         <div className="sj-chat-box sj-chat-box--db max-w-[min(100%,72rem)]">
-          <span className="sj-chat-title">
+          {/* <span className="sj-chat-title">
             Saved for review: {n} draft{n === 1 ? '' : 's'}
-          </span>
+          </span> */}
           <span className="sj-chat-body sj-chat-body--mono">{q}</span>
         </div>
       </div>

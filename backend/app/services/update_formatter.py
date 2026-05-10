@@ -152,33 +152,45 @@ change_detection_agent = Agent(
     instructions=f"""
     You are the SJ Group Task Change Detection Agent.
     You are a meticulous SQL expert with read-only access to the organization's Azure PostgreSQL database, which has tables for tasks, projects, people, and dependencies.
-    You will take the response from the details extractor agent and run multiple queries on the database to determine if each task is new, or if it's not what are the updates, and if human clarification is needed.
-    You should start broadly to understand the current state of the database, what are ids like, what are naming conventions, who usually works on what tasks.
-    You should find similar tasks, projects, people.
+    You will take the response from the details extractor agent and run multiple queries on the database to determine if each task is new, or if not what are the updates, and if human clarification is needed.
+    Remember to use fuzzy searches for task_titles or project names because natural language allows the same thing to be said in many ways. This could mean using wildcards, partial matches, synonyms, etc for fuzzy searches.
+    SOP:
+    A. Identify: You should start by quickly guessing what part of the input belongs where in the database—actionables/verbs→tasks, person names→people, project names or big deliverables→projects, links→dependencies.
+    B. Find match: Then you should query the database to find tasks, projects, people, dependencies similar to what you've discovered in the input.
+    1. If task_id and project_id are in the input, query tasks first (batch those ids). 
+        Start tasks query with a WHERE fragment equivalent to WHERE project_id='<PROJECT_ID>' AND task_id IN ('<ID1>','<ID2>',...); select at least task_id, project_id, task_title, owner_id, owner_name, planned_start, planned_due, status, percent_complete, priority, is_approved (projection * or list those columns).
+    2. If not, fuzzy/synonym search task_title and project_name. 
+    3. If still stuck, query projects and people (exact first, else fuzzy). 
+    4. If still no similar or related tasks found, use people.discipline/role, tasks.planned_start/planned_due, or projects.region as weak evidence. 
+    5. Then query dependencies (predecessor/successor tasks). Repeat steps 1-5 until you've found the related tasks or you've exhausted your resources.
+
+    Notes on query tool use (tool name: ``query_existing_tasks`` — call this tool; there is no separate "query" tool):
+    * Use exactly these keyword arguments: ``query_str_tasks``, ``query_str_projects``, ``query_str_people``, ``query_str_dependencies``. Pass a string for each table you need in this call; omit the others.
+    * Each argument is either (a) a projection only: ``*`` or ``task_id, task_title, ...`` with NO ``FROM``, or (b) a tail starting with ``WHERE``, ``ORDER BY``, ``LIMIT``, etc., or (c) **columns then filters**: ``task_id, task_title, ... WHERE project_id = 'P1' AND ...`` (same line/string; still no ``FROM``). ``AND`` / ``OR`` inside ``WHERE`` are valid (e.g. ``WHERE project_id = 'P1' AND task_id IN ('T1','T2')``).
+    * You can combine several tables in one tool call by setting multiple ``query_str_*`` at once (preferred when batching).
+    * At least one ``query_str_*`` must be non-empty per call.
+    * Run multiple tool calls if needed. Not catching a previous task is much worse than taking a long time or falsely identifying a task when you could mark it for conflict.
+    * Batch tables in one call when possible.
+    * These are the tables you can query:
+    {json.dumps({"Tasks": Task.__table__.columns.keys(), "Projects": Project.__table__.columns.keys(), "People": Person.__table__.columns.keys(), "Dependencies": Dependency.__table__.columns.keys()}, indent=2, sort_keys=True)}
     Tasks IDs are unique and sequential but task_titles are not.
     Project IDs are unique and sequential but project_names are not.
     Dependencies use task ids.
-    If task_id and project_id are present in input, you MUST start with this exact query pattern (batch all ids):
-    SELECT task_id, project_id, task_title, owner_id, owner_name, planned_start, planned_due, status, percent_complete, priority, is_approved
-    FROM tasks
-    WHERE project_id='<PROJECT_ID>' AND task_id IN ('<ID1>','<ID2>',...);
-    If you find an exact match for all other columns for a task_id project_id pair,
-    mark as a duplicate and make sure succeeding agents know to ignore this task update ie not add to datbase.
-    Remember to use fuzzy searches for task_titles or project names because natural language allows the same thing to be said in many ways.
-    Check if owner_name and owner_id are present and match.
-    Use wildcards and partial matches etc.
-    You can use as many queries as needed. Not catching a previous task is much worse than taking a long time or falsely identifying a task when you could mark it for conflict.
-    But remember to batch queries when possible.
-    These are the tables you can query:
-    {json.dumps({"Tasks": Task.__table__.columns.keys(), "Projects": Project.__table__.columns.keys(), "People": Person.__table__.columns.keys(), "Dependencies": Dependency.__table__.columns.keys()}, indent=2, sort_keys=True)}
 
-    Only give your response after all your queries are done.
-    Your succinct output will be used by the details extractor agent to adjust their response and by the formatter agent to format the final response.
-    You should note your uncertainties so succeeding agents can adjust overall confidence accordingly.
-    You should aim to align the details extractor agent's description of tasks with the database's description.
+    Notes on your response:
+    * Only give your response after all your queries are done.
+    * Lower confidence when match is missing/fuzzy or the update regresses its match (e.g. percent_complete decreases). 
+    * Conflict_needs_clarification if input owner_id and owner_name clash against people.person_id and display_name when both sides appear in the input. But new, non-clashing is okay. 
+    * Downstream only one draft per base task_id may exist.
+    * If you find an exact match for all other columns for a task_id project_id pair, mark as a duplicate and make sure succeeding agents know to ignore this task update ie not add to database.
+    * Your succinct output will be used by the details extractor agent to adjust their response and by the formatter agent to format the final response.
+    * You should note your uncertainties so succeeding agents can adjust overall confidence accordingly.
+    * Note when you've believed you've exhausted your resources so the details extractor agent makes its final attempt.
+    * No need to respond to the details extractor agent's final attempt.
+
+    If you've only done 1 query, consider doing another to try to understand the current state of the database, what are ids like, what are naming conventions, who usually works on what tasks.
+    Remember, you are trying to align the details extractor agent's description of tasks with the database's description.
     That is, the organization's conventions for titling tasks, describing their details, their relation to projects and people, etc.
-    Note when you've believed you've exhausted your resources so the details extractor agent makes its final attempt.
-    No need to respond to the details extractor agent's final attempt.
     """
 )
 
@@ -206,14 +218,6 @@ async def workflow_execution(prior_iteration_notes: str = "") -> str:
         )
     else:
         workflow_text = full_user
-    print(
-        "workflow.run input: full_user_chars=",
-        len(full_user),
-        "notes_chars=",
-        len(notes),
-        "total_chars=",
-        len(workflow_text),
-    )
     last_worker: str | None = None
     segment_text: str = ""
     events = workflow.run(workflow_text, stream=True)
@@ -248,7 +252,6 @@ async def workflow_execution(prior_iteration_notes: str = "") -> str:
                 chunk = msg.text or ""
                 if not chunk.strip():
                     continue
-                print(f"\n{author}: {chunk}", end="", flush=True)
                 try_emit_progress(
                     {"kind": "agent", "author": author, "text": chunk})
                 responses.append(f"{author}: {chunk}")
@@ -260,12 +263,10 @@ async def workflow_execution(prior_iteration_notes: str = "") -> str:
         author = resolve_author(data, ex_id)
         chunk = data.text or ""
         if last_worker is None:
-            print(f"\n{author}: {chunk}", end="", flush=True)
             responses.append(f"{author}: {chunk}")
             last_worker = author
             segment_text = chunk
         elif author == last_worker:
-            print(chunk, end="", flush=True)
             if responses:
                 responses[-1] += chunk
             segment_text += chunk
@@ -274,7 +275,6 @@ async def workflow_execution(prior_iteration_notes: str = "") -> str:
                 try_emit_progress(
                     {"kind": "agent", "author": last_worker, "text": segment_text}
                 )
-            print(f"\n{author}: {chunk}", end="", flush=True)
             responses.append(f"{author}: {chunk}")
             last_worker = author
             segment_text = chunk
@@ -369,7 +369,6 @@ async def format_update(text: str, no_ai: bool = False) -> TaskUpdateList:
         )
     finally:
         _workflow_full_user_input.reset(token)
-    print("\n\nWorkflow Executor Response:", workflow_executor_response)
 
     formatter_prompt = f"""\n\nUser Input: {text}\n\n
         \n\nDetails Extractor Agent and Change Detection Agent Discussion: \n\n{workflow_executor_response.value}\n\n

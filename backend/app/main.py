@@ -2,23 +2,28 @@ import asyncio
 from datetime import date
 import json
 import os
+import re
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from openai import APIStatusError
-from sqlalchemy import or_, text
+from sqlalchemy import or_, text, update
+from sqlalchemy.orm import Session
 
 from .database import SessionLocal
 from .models import Dependency, Task
 from .schemas import CommitUpdate, UpdateRequest
 from .services.change_detector import (
     clear_stream_progress_fallback,
-    detect_changes_batched,
     set_stream_progress_fallback,
     stream_progress_emit,
 )
-from .services.update_formatter import format_update
+from .services.update_formatter import (
+    DRAFT_ID_SUFFIX,
+    base_task_id_from_draft_row_id,
+    format_update,
+)
 
 app = FastAPI(title="SJ Project Planner API")
 app.add_middleware(
@@ -33,15 +38,41 @@ app.add_middleware(
 # drafts (unaccepted tasks)
 # - POST /create to send to AI then add formatted version to task database as a draft
 # - GET to view for approval
-# - PATCH to approve, flip is_approve flag so it'll be considered (official) tasks
-# - TODO: erase above, draft bug fix 
-# - TODO: POST /accept to delete old task if exists and change draft to official task
+# - POST /accept to delete old task if exists and change draft to official task
 # - DELETE to discard draft and delete from tasks table
 
 # (official) tasks
 # - GET to view for Gantt chart
 
 # drafts/(official) tasks are both Task objects
+
+
+def _delete_tasks_cascade_dependencies(db: Session, task_ids: list[str]) -> None:
+    """Remove dependency rows touching these task ids, then delete the tasks."""
+    if not task_ids:
+        return
+    db.query(Dependency).filter(
+        or_(
+            Dependency.predecessor_task_id.in_(task_ids),
+            Dependency.successor_task_id.in_(task_ids),
+        )
+    ).delete(synchronize_session=False)
+    db.query(Task).filter(Task.task_id.in_(task_ids)).delete(
+        synchronize_session=False)
+
+
+def _max_canonical_task_numeric(db: Session) -> int:
+    """Largest ``T#####`` numeric suffix in ``tasks.task_id`` (global across projects)."""
+    max_n = 0
+    for (tid,) in db.query(Task.task_id).all():
+        m = re.fullmatch(r"T(\d+)", tid)
+        if m:
+            max_n = max(max_n, int(m.group(1)))
+    return max_n
+
+
+def _format_canonical_task_id(n: int) -> str:
+    return f"T{n:05d}"
 
 
 @app.get("/")
@@ -73,8 +104,8 @@ async def post_drafts(request_text: UpdateRequest):
             detail=e.message
         )
     # Check action types for all tasks and detect changes
-    with SessionLocal() as db:
-        detect_changes_batched(db, ai_response.tasks)  # type: ignore
+    # with SessionLocal() as db:
+    #     detect_changes_batched(db, ai_response.tasks)  # type: ignore
 
     return ai_response.model_dump(mode='json')  # type: ignore
 
@@ -114,8 +145,6 @@ async def post_drafts_stream(request_text: UpdateRequest):
                 emit_progress({"kind": "status", "phase": "formatting"})
                 ai_response = await format_update(user_text, no_ai=no_ai)
                 emit_progress({"kind": "status", "phase": "writing_drafts"})
-                with SessionLocal() as db:
-                    detect_changes_batched(db, ai_response.tasks)  # type: ignore
                 emit_progress({"kind": "status", "phase": "done"})
                 dump = ai_response.model_dump(mode="json")  # type: ignore
                 await queue.put(("final", dump))
@@ -183,15 +212,7 @@ async def delete_drafts(request_text: CommitUpdate):
                 )
 
             id_list = list(found_ids)
-            db.query(Dependency).filter(
-                or_(
-                    Dependency.predecessor_task_id.in_(id_list),
-                    Dependency.successor_task_id.in_(id_list),
-                )
-            ).delete(synchronize_session=False)
-
-            db.query(Task).filter(Task.task_id.in_(id_list)).delete(
-                synchronize_session=False)
+            _delete_tasks_cascade_dependencies(db, id_list)  # type: ignore
 
             db.commit()
             return {
@@ -208,30 +229,95 @@ async def delete_drafts(request_text: CommitUpdate):
             )
 
 
-@app.patch("/api/drafts/approve")
-async def patch_drafts(request_text: CommitUpdate):
+@app.post("/api/drafts/approve")
+async def post_tasks(request_text: CommitUpdate):
     """Permanently approve selected rows."""
     # TODO: add dependency creation
-    task_ids = [str(task_id).strip()
-                for task_id in request_text.task_ids if str(task_id).strip()]
+    task_ids = list(
+        dict.fromkeys(
+            str(task_id).strip()
+            for task_id in request_text.task_ids
+            if str(task_id).strip()
+        )
+    )
+    not_drafts = [tid for tid in task_ids if not tid.endswith(DRAFT_ID_SUFFIX)]
+    if not_drafts:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Only draft task ids (ending with "
+                f"{DRAFT_ID_SUFFIX!r}) can be approved. "
+                f"Invalid: {sorted(not_drafts)}"
+            ),
+        )
+
     with SessionLocal() as db:
         try:
-            tasks_to_approve = db.query(Task).filter(
-                Task.task_id.in_(task_ids)).all()
-            found_ids = {t.task_id for t in tasks_to_approve}
+            drafts = db.query(Task).filter(Task.task_id.in_(task_ids)).all()
+            found_ids = {t.task_id for t in drafts}
             missing = set(task_ids) - found_ids  # type: ignore
             if missing:
                 raise HTTPException(
                     status_code=404,
                     detail=f"Task IDs not found: {sorted(missing)}. Try refreshing.",
                 )
+            if any(bool(t.is_approved) for t in drafts):
+                raise HTTPException(
+                    status_code=400,
+                    detail="One or more tasks are already approved.",
+                )
 
-            for task in tasks_to_approve:
-                task.is_approved = True  # type: ignore
+            bases = [base_task_id_from_draft_row_id(tid) for tid in task_ids]
+            approved_bases = {
+                row[0]
+                for row in db.query(Task.task_id)
+                .filter(
+                    Task.task_id.in_(bases),
+                    Task.is_approved.is_(True),
+                )
+                .all()
+            }
+
+            update_pairs: list[tuple[str, str]] = []
+            new_pairs: list[tuple[str, str]] = []
+            for tid in task_ids:
+                base = base_task_id_from_draft_row_id(tid)
+                if base in approved_bases:
+                    update_pairs.append((tid, base))
+                else:
+                    new_pairs.append((tid, base))
+
+            if update_pairs:
+                delete_ids = list({b for _, b in update_pairs})
+                _delete_tasks_cascade_dependencies(db, delete_ids)
+                for draft_id, base in update_pairs:
+                    db.execute(
+                        update(Task)
+                        .where(Task.task_id == draft_id)
+                        .values(task_id=base, is_approved=True)
+                    )
+
+            db.flush()
+
+            if new_pairs:
+                next_n = _max_canonical_task_numeric(db) + 1
+                for i, (draft_id, _) in enumerate(new_pairs):
+                    new_id = _format_canonical_task_id(next_n + i)
+                    db.execute(
+                        update(Task)
+                        .where(Task.task_id == draft_id)
+                        .values(task_id=new_id, is_approved=True)
+                    )
 
             db.commit()
 
-            return {"status": "success", "message": f"Approved {len(tasks_to_approve)} tasks."}
+            return {
+                "status": "success",
+                "message": (
+                    f"Approved {len(task_ids)} task(s) "
+                    f"({len(update_pairs)} update(s), {len(new_pairs)} new)."
+                ),
+            }
         except HTTPException:
             raise
         except Exception as e:

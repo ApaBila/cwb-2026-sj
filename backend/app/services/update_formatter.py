@@ -13,6 +13,7 @@ from agent_framework import (
 from agent_framework.foundry import FoundryChatClient
 from azure.identity import DefaultAzureCredential
 
+from app.database import SessionLocal
 from app.models import Dependency, Person, Project, Task
 from app.schemas import TaskUpdate, TaskUpdateList, WorkflowExecutionResponse
 from app.services.change_detector import query_existing_tasks, try_emit_progress
@@ -21,6 +22,94 @@ from app.services.change_detector import query_existing_tasks, try_emit_progress
 
 TEMPERATURE = 0.01
 SEED = 123
+
+DRAFT_ID_SUFFIX = "_draft"
+_WARN_DRAFT_CONFLICT = (
+    "Draft could not be created. This task is being edited by another user."
+)
+
+
+def base_task_id_from_draft_row_id(draft_row_task_id: str) -> str:
+    """Strip ``DRAFT_ID_SUFFIX`` from a stored draft row ``task_id`` (e.g. ``T00001_draft`` → ``T00001``)."""
+    tid = (draft_row_task_id or "").strip()
+    if tid.endswith(DRAFT_ID_SUFFIX):
+        tid = tid[: -len(DRAFT_ID_SUFFIX)]
+    return tid
+
+
+def draft_row_task_id_for_base(base_task_id: str) -> str:
+    """Draft primary key for a logical base id (``base`` + ``DRAFT_ID_SUFFIX``)."""
+    return f"{base_task_id}{DRAFT_ID_SUFFIX}"
+
+
+def _base_task_id_for_draft(task_update: TaskUpdate) -> str:
+    tid = base_task_id_from_draft_row_id(task_update.task_id or "")
+    if not tid:
+        tid = f"DRAFT_{uuid.uuid4().hex[:8].upper()}"
+    return tid
+
+
+def _draft_row_task_id(base: str) -> str:
+    return draft_row_task_id_for_base(base)
+
+
+def _persist_draft_tasks(task_updates: list[TaskUpdate]) -> list[TaskUpdate]:
+    """Insert draft rows with ``task_id`` = ``<base>_draft``; one draft per base; ``add_all`` batch."""
+    if not task_updates:
+        return []
+
+    task_columns = {c.key for c in Task.__table__.columns}
+
+    with SessionLocal() as db:
+        draft_ids = [_draft_row_task_id(_base_task_id_for_draft(task)) for task in task_updates]
+        existing_db = {
+            t.task_id
+            for t in db.query(Task).filter(Task.task_id.in_(draft_ids)).all()
+        }
+        pending_in_batch: set[str] = set()
+        to_add: list[Task] = []
+        result: list[TaskUpdate] = []
+
+        for task_update in task_updates:
+            base = _base_task_id_for_draft(task_update)
+            did = _draft_row_task_id(base)
+            # LOCK. Only allow 1 draft per base task id.
+            if did in existing_db or did in pending_in_batch:
+                print(f"{_WARN_DRAFT_CONFLICT} (base_task_id={base!r})")
+                try_emit_progress(
+                    {
+                        "kind": "warning",
+                        "message": _WARN_DRAFT_CONFLICT,
+                        "base_task_id": base,
+                        "draft_task_id": did,
+                    }
+                )
+                continue
+
+            task_data = task_update.model_dump(exclude_none=True)
+            # Remove project related fields that aren't in tasks
+            task_data.pop("project_name", None)
+            task_data.pop("project_timezone", None)
+            task_data.pop("discipline", None)
+            task_data["task_id"] = did
+            task_data["is_approved"] = False
+            filtered = {k: v for k, v in task_data.items() if k in task_columns}
+            to_add.append(Task(**filtered))
+            result.append(task_update.model_copy(update={"task_id": did}))
+            pending_in_batch.add(did)
+
+        if not to_add:
+            return []
+
+        try:
+            db.add_all(to_add)
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            print(f"Error committing draft tasks from formatter: {e}")
+            raise
+
+    return result
 
 client = FoundryChatClient(
     project_endpoint=os.getenv(
@@ -246,34 +335,30 @@ formatter_agent = Agent(
 
 async def format_update(text: str, no_ai: bool = False) -> TaskUpdateList:
     if no_ai:
-        # Generate unique task_id for each draft to avoid primary key conflicts
-        draft_task_id = f"DRAFT_{uuid.uuid4().hex[:8].upper()}"
-        return TaskUpdateList(
-            tasks=[
-                TaskUpdate(
-                    project_id=None,
-                    project_name="Unspecified",
-                    project_timezone="Unspecified",
-                    source_date_iso=None,
-                    task_id=draft_task_id,
-                    task_title="[DRAFT] Sample Task",
-                    discipline=None,
-                    owner_id=None,
-                    owner_name=None,
-                    start_date_raw=None,
-                    planned_start=None,
-                    due_date_raw=None,
-                    planned_due=None,
-                    status="Unknown",
-                    percent_complete=None,
-                    priority="Low",
-                    dependency=None,
-                    source="meeting_notes",
-                    confidence="Low",
-                    action_type="conflict_needs_clarification",
-                )
-            ]
+        base_task_id = f"DRAFT_{uuid.uuid4().hex[:8].upper()}"
+        sample = TaskUpdate(
+            project_id=None,
+            project_name="Unspecified",
+            project_timezone="Unspecified",
+            source_date_iso=None,
+            task_id=base_task_id,
+            task_title="[DRAFT] Sample Task",
+            discipline=None,
+            owner_id=None,
+            owner_name=None,
+            start_date_raw=None,
+            planned_start=None,
+            due_date_raw=None,
+            planned_due=None,
+            status="Unknown",
+            percent_complete=None,
+            priority="Low",
+            dependency=None,
+            source="meeting_notes",
+            confidence="Low",
+            action_type="conflict_needs_clarification",
         )
+        return TaskUpdateList(tasks=_persist_draft_tasks([sample]))
 
     token = _workflow_full_user_input.set(text)
     try:
@@ -295,4 +380,5 @@ async def format_update(text: str, no_ai: bool = False) -> TaskUpdateList:
         options={"response_format": TaskUpdateList,
                  "temperature": TEMPERATURE, "seed": SEED}
     )
-    return TaskUpdateList.model_validate(formatter_response.value)
+    parsed = TaskUpdateList.model_validate(formatter_response.value)
+    return TaskUpdateList(tasks=_persist_draft_tasks(list(parsed.tasks)))

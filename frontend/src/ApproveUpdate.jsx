@@ -558,7 +558,7 @@ function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts, onEditSelected, hide
 
     try {
       const response = await fetch(`${apiBaseUrl}/api/drafts/approve`, {
-        method: 'PATCH',
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },

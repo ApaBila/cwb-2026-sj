@@ -75,6 +75,32 @@ def _format_canonical_task_id(n: int) -> str:
     return f"T{n:05d}"
 
 
+_CHANGELOG_SKIP_COLS = frozenset(
+    {"task_id", "is_approved", "confidence", "action_type"}
+)
+
+
+def _task_changelog_diff(base: Task, draft: Task) -> list[dict]:
+    """Pairs of column names with differing base vs draft values (skip ids / approval flag)."""
+    out: list[dict] = []
+    for col in Task.__table__.columns:
+        key = col.key
+        if key in _CHANGELOG_SKIP_COLS:
+            continue
+        b = getattr(base, key)
+        d = getattr(draft, key)
+        if b == d:
+            continue
+        out.append(
+            {
+                "column": key,
+                "base": b.isoformat() if isinstance(b, date) else b,
+                "draft": d.isoformat() if isinstance(d, date) else d,
+            }
+        )
+    return out
+
+
 @app.get("/")
 def health_status():
     """Checks if we can connect to the database"""
@@ -188,6 +214,69 @@ async def get_drafts():
         results = db.execute(
             text("SELECT * FROM tasks WHERE is_approved = false")).mappings()
     return [dict(result) for result in results]
+
+
+@app.post("/api/drafts/changelog")
+async def post_drafts_changelog(body: CommitUpdate):
+    """Diff approved baseline rows vs draft rows for selected *_draft task ids (changed columns only)."""
+    task_ids = list(
+        dict.fromkeys(
+            str(t).strip() for t in body.task_ids if str(t).strip()
+        )
+    )
+    bad = [x for x in task_ids if not x.endswith(DRAFT_ID_SUFFIX)]
+    if bad:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Only draft task ids (ending with {DRAFT_ID_SUFFIX!r}) are allowed: {sorted(bad)}",
+        )
+    with SessionLocal() as db:
+        items: list[dict] = []
+        drafts = db.query(Task).filter(Task.task_id.in_(task_ids)).all()
+        by_id = {t.task_id: t for t in drafts}
+        missing = set(task_ids) - set(by_id)  # type: ignore
+        if missing:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Task IDs not found: {sorted(missing)}",
+            )
+        if any(bool(t.is_approved) for t in drafts):
+            raise HTTPException(
+                status_code=400,
+                detail="Changelog is only for draft (unapproved) rows.",
+            )
+        for did in task_ids:
+            draft = by_id[did]  # type: ignore
+            base_id = base_task_id_from_draft_row_id(did)
+            base = (
+                db.query(Task)
+                .filter(
+                    Task.task_id == base_id,
+                    Task.is_approved.is_(True),
+                )
+                .first()
+            )
+            if base is None:
+                items.append(
+                    {
+                        "draft_task_id": did,
+                        "base_task_id": None,
+                        "task_title": draft.task_title,
+                        "project_id": draft.project_id,
+                        "changes": [],
+                    }
+                )
+                continue
+            items.append(
+                {
+                    "draft_task_id": did,
+                    "base_task_id": base_id,
+                    "task_title": draft.task_title,
+                    "project_id": draft.project_id,
+                    "changes": _task_changelog_diff(base, draft),
+                }
+            )
+        return {"items": items}
 
 
 @app.delete("/api/drafts/reject")

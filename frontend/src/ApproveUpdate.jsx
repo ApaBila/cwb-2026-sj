@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
 import { Spinner, Button, FileInput, Label } from 'flowbite-react'
 import DraftsDataTable from './DraftsDataTable'
 import { formatTasksAsEditPrefill } from './utils/gantt_config'
@@ -20,6 +20,39 @@ function appendFilesToMessage(prev, addition) {
   if (!add) return prev
   if (!prev || !prev.trim()) return `${add}\n`
   return `${prev.replace(/\s+$/, '')}\n\n${add}\n`
+}
+
+function draftChangelogLabel(it) {
+  const t = it.task_title != null && String(it.task_title).trim() ? it.task_title : '—'
+  const p =
+    it.project_id != null && String(it.project_id).trim() ? it.project_id : '—'
+  return `${t} (${p})`
+}
+
+/** Format POST /api/drafts/changelog (task / id columns omitted; no confidence or action_type). */
+function formatDraftChangelog(payload) {
+  const items = payload?.items
+  if (!Array.isArray(items) || items.length === 0) return 'Nothing to compare.'
+  const lines = []
+  for (const it of items) {
+    const ch = it.changes || []
+    const label = draftChangelogLabel(it)
+    if (ch.length === 0) {
+      lines.push(
+        it.base_task_id == null
+          ? `${label}: no published row to compare (new task).`
+          : `${label}: no field changes vs published row.`,
+      )
+      continue
+    }
+    lines.push(label)
+    for (const c of ch) {
+      const b = c.base == null || c.base === '' ? '—' : String(c.base)
+      const d = c.draft == null || c.draft === '' ? '—' : String(c.draft)
+      lines.push(`${c.column}: ${b} -> ${d}`)
+    }
+  }
+  return lines.join('\n')
 }
 
 function FileAttachInput({ id, onAppend, disabled }) {
@@ -519,10 +552,24 @@ function confirmRejectDrafts(selectedCount) {
 }
 
 function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts, onEditSelected, hideDraftsTable = false }) {
+  const draftsScrollAnchorRef = useRef(null)
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [isCommitting, setIsCommitting] = useState(false)
   const [isRejecting, setIsRejecting] = useState(false)
   const [commitError, setCommitError] = useState('')
+  const [viewChangesText, setViewChangesText] = useState('')
+  const [viewChangesBusy, setViewChangesBusy] = useState(false)
+
+  useLayoutEffect(() => {
+    if (hideDraftsTable || drafts.length === 0) return
+    const id = requestAnimationFrame(() => {
+      draftsScrollAnchorRef.current?.scrollIntoView({
+        block: 'end',
+        behavior: 'smooth',
+      })
+    })
+    return () => cancelAnimationFrame(id)
+  }, [drafts.length, viewChangesText, hideDraftsTable])
 
   function toggleDraftSelection(taskId) {
     const newSelected = new Set(selectedIds)
@@ -575,6 +622,7 @@ function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts, onEditSelected, hide
       }
 
       setSelectedIds(new Set())
+      setViewChangesText('')
       await refreshDrafts()
     } catch (error) {
       setCommitError(error.message || 'Could not apply your approval. Please try again.')
@@ -619,11 +667,41 @@ function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts, onEditSelected, hide
       }
 
       setSelectedIds(new Set())
+      setViewChangesText('')
       await refreshDrafts()
     } catch (error) {
       setCommitError(error.message || 'Could not discard those suggestions. Please try again.')
     } finally {
       setIsRejecting(false)
+    }
+  }
+
+  async function handleViewChanges() {
+    if (selectedIds.size === 0 || busy || viewChangesBusy) return
+    setViewChangesBusy(true)
+    setCommitError('')
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/drafts/changelog`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_ids: Array.from(selectedIds) }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        const d = data?.detail
+        const msg =
+          typeof d === 'string'
+            ? d
+            : Array.isArray(d)
+              ? d.map((e) => e?.msg || JSON.stringify(e)).join(' ')
+              : 'Could not load changes.'
+        throw new Error(msg)
+      }
+      setViewChangesText(formatDraftChangelog(data))
+    } catch (error) {
+      setCommitError(error.message || 'Could not load changes.')
+    } finally {
+      setViewChangesBusy(false)
     }
   }
 
@@ -647,6 +725,14 @@ function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts, onEditSelected, hide
           layout="embedded"
         />
       )}
+      {viewChangesText && !hideDraftsTable ? (
+        <div className="sj-chat-row">
+          <div className="sj-chat-box sj-chat-box--agent max-w-[min(100%,72rem)]">
+            <span className="sj-chat-title">Draft changes</span>
+            <span className="sj-chat-body whitespace-pre-wrap">{viewChangesText}</span>
+          </div>
+        </div>
+      ) : null}
       {drafts.length > 0 && !hideDraftsTable ? (
         <div className="approve-actions">
           <div className="flex w-full flex-wrap justify-end gap-3">
@@ -654,7 +740,16 @@ function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts, onEditSelected, hide
               pill
               type="button"
               className="sj-action-pill--outline"
-              disabled={selectedIds.size === 0 || busy}
+              disabled={selectedIds.size === 0 || busy || viewChangesBusy}
+              onClick={handleViewChanges}
+            >
+              {viewChangesBusy ? 'Loading…' : `View Changes (${selectedIds.size})`}
+            </Button>
+            <Button
+              pill
+              type="button"
+              className="sj-action-pill--outline"
+              disabled={selectedIds.size === 0 || busy || viewChangesBusy}
               onClick={handleEditSelectedRows}
             >
               {`Edit (${selectedIds.size})`}
@@ -682,6 +777,13 @@ function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts, onEditSelected, hide
         </div>
       ) : commitError ? (
         <p className="error submit-error">{commitError}</p>
+      ) : null}
+      {drafts.length > 0 && !hideDraftsTable ? (
+        <div
+          ref={draftsScrollAnchorRef}
+          className="h-px w-full shrink-0"
+          aria-hidden
+        />
       ) : null}
     </section>
   )

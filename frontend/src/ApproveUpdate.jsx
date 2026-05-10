@@ -505,7 +505,7 @@ function SubmitUpdate({
   )
 }
 
-function confirmRejectDrafts(selectedCount, totalDraftCount) {
+function confirmRejectDrafts(selectedCount) {
   const n = selectedCount
   const lines = [
     `You are about to permanently discard ${n} draft${n === 1 ? '' : 's'} that ${n === 1 ? 'has' : 'have'} not been approved yet.`,

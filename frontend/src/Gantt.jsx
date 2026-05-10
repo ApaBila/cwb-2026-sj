@@ -10,7 +10,10 @@ import {
   GANTT_HEADER_ROW2_PX,
   GANTT_HEADER_LINE1_Y,
   GANTT_HEADER_LINE2_Y,
+  GANTT_HEADER_LINE2_DAY_MONTH_Y,
+  GANTT_HEADER_LINE3_DAY_DAY_Y,
   GANTT_CHART_BODY_BOTTOM_PAD,
+  formatTasksAsEditPrefill,
 } from './utils/gantt_config';
 import { ownerInitials } from './utils/initials';
 import { sortTasksForGanttLayout } from './utils/gantt_task_order';
@@ -42,41 +45,45 @@ const FROZEN_COLGROUP = (
 
 /** DraftsDataTable thead label cell classes (no sort); uses text-sj-body from index.css. */
 const thLabelClass =
-  'px-2 py-2 font-sans text-sj-body font-semibold whitespace-nowrap border-b border-black/10 align-bottom text-left';
+  'px-2 py-2 font-sans text-sj-body font-semibold whitespace-nowrap align-bottom text-left';
 /** DraftsDataTable thead filter row cell classes. */
 const thFilterClass =
-  'px-2 pb-2 pt-1 border-b border-black/10 align-top text-left';
+  'px-2 pb-2 pt-1 align-top text-left';
 /** DraftsDataTable filter input classes. */
 const filterInputClass =
-  'w-full min-w-0 max-w-[18rem] box-border border-2 border-black/20 bg-white px-2 py-0.5 font-sans text-sj-body font-semibold text-black placeholder:text-black/35 placeholder:font-normal focus:border-sjblue focus:outline-none';
+  'w-full min-w-0 max-w-[18rem] box-border rounded-xl bg-sj-surface px-2 py-0.5 font-sans text-sj-body font-semibold text-black placeholder:text-black/35 placeholder:font-normal focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sjblue/50';
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DOW_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /**
- * Two-line timeline header labels per view (matches frozen thead height: row1 + row2).
- * Day: DOW + MM/DD; Week: month abbr + DD; Month: YYYY + month abbr.
+ * Timeline header labels per column tick (frozen thead height matches GANTT_CHART_HEADER_PX).
+ * Day: DOW (row 1) + MM + DD on separate lines below; Week: month abbr + DD; Month: YYYY + month abbr.
  */
-function ganttHeaderPair(viewMode, d) {
+function timelineTickLabels(viewMode, d) {
   if (viewMode === 'Day') {
     return {
-      line1: DOW_ABBR[d.getDay()],
-      line2: date_utils.format(d, 'MM/DD'),
+      kind: 'day',
+      dow: DOW_ABBR[d.getDay()],
+      month: MONTH_ABBR[d.getMonth()],
+      day: String(d.getDate()).padStart(2, '0'),
     };
   }
   if (viewMode === 'Week') {
     return {
+      kind: 'two',
       line1: MONTH_ABBR[d.getMonth()],
       line2: String(d.getDate()).padStart(2, '0'),
     };
   }
   if (viewMode === 'Month') {
     return {
+      kind: 'two',
       line1: String(d.getFullYear()),
       line2: MONTH_ABBR[d.getMonth()],
     };
   }
-  return { line1: '', line2: '' };
+  return { kind: 'two', line1: '', line2: '' };
 }
 
 /** Unscheduled row count above which the table block fills one viewport (scroll inside). */
@@ -93,72 +100,6 @@ function predSuccDetails(bar, bars) {
     .filter((b) => (b.dependencies || []).includes(bar.task_id))
     .map((b) => ({ taskId: b.task_id, label: b.task_title || b.task_id, inChart: true }));
   return { preds, succs };
-}
-
-/** Layout-only keys from Gantt bar rows (not persisted task fields). */
-const LAYOUT_KEYS = new Set(['x', 'y', 'w', 'index']);
-
-/** Stable column order for human-readable edit blocks (matches Task model + dependencies). */
-const TASK_EDIT_FIELD_ORDER = [
-  'task_id',
-  'task_title',
-  'source_date_iso',
-  'project_id',
-  'owner_id',
-  'owner_name',
-  'start_date_raw',
-  'planned_start',
-  'due_date_raw',
-  'planned_due',
-  'status',
-  'dependency',
-  'percent_complete',
-  'priority',
-  'source',
-  'confidence',
-  'action_type',
-  'is_approved',
-  'dependencies',
-];
-
-function formatEditFieldValue(value) {
-  if (value === null || value === undefined) return '—';
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? '—' : date_utils.format(value, 'YYYY-MM-DD');
-  }
-  if (Array.isArray(value)) {
-    return value.length ? value.join(', ') : '—';
-  }
-  if (typeof value === 'boolean') return value ? 'true' : 'false';
-  return String(value);
-}
-
-/**
- * Builds a hand-written-form style blob for the Update page textarea (not JSON).
- * @param {Record<string, unknown>[]} tasks
- */
-function formatTasksAsEditPrefill(tasks) {
-  const sorted = [...tasks].sort((a, b) =>
-    String(a.task_id ?? '').localeCompare(String(b.task_id ?? '')),
-  );
-  const blocks = [];
-  for (const raw of sorted) {
-    const row = { ...raw };
-    LAYOUT_KEYS.forEach((k) => {
-      delete row[k];
-    });
-    const lines = [`--- Task ${row.task_id ?? '—'} ---`];
-    for (const key of TASK_EDIT_FIELD_ORDER) {
-      if (!Object.prototype.hasOwnProperty.call(row, key)) continue;
-      lines.push(`${key}: ${formatEditFieldValue(row[key])}`);
-    }
-    for (const key of Object.keys(row).sort()) {
-      if (TASK_EDIT_FIELD_ORDER.includes(key)) continue;
-      lines.push(`${key}: ${formatEditFieldValue(row[key])}`);
-    }
-    blocks.push(lines.join('\n'));
-  }
-  return blocks.join('\n\n');
 }
 
 function Gantt() {
@@ -576,24 +517,24 @@ function Gantt() {
   const unscheduledTall = unscheduledN > UNSCHEDULED_VIEWPORT_THRESHOLD;
 
   return (
-    <main className="gantt-page bg-white">
+    <main className="gantt-page">
+      <section className="compose-block shrink-0" aria-label="Stay in the loop">
+        <p className="sj-compose-lede m-0">
+          <strong className="font-semibold text-sjblue">Stay in the loop.</strong> See what is on the calendar, how work
+          lines up, and what still needs dates—all read-only here. To change anything, use{' '}
+          <span className="font-semibold text-black/75">Get in →</span> and approve drafts first.
+        </p>
+      </section>
       <div className="gantt-split">
       <section
         className={`gantt-unscheduled-panel ${
           unscheduledTall ? 'gantt-unscheduled-panel--viewport' : 'gantt-unscheduled-panel--fit'
         }`}
-        aria-label="Unscheduled Tasks"
+        aria-label="Unscheduled tasks"
       >
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
-          <h2 className="sj-text-h2 m-0 font-semibold text-black">Unscheduled Tasks</h2>
-          <Button
-            pill
-            size="xl"
-            type="button"
-            className="sj-action-pill"
-            disabled={selectedUnscheduledIds.size === 0}
-            onClick={handleEditUnscheduled}
-          >
+          <h2 className="sj-text-h2 m-0 font-semibold text-black">Unscheduled tasks</h2>
+          <Button pill type="button" className="sj-action-pill" disabled={selectedUnscheduledIds.size === 0} onClick={handleEditUnscheduled}>
             Edit selected
           </Button>
         </div>
@@ -633,15 +574,10 @@ function Gantt() {
               </DropdownItem>
             ))}
           </Dropdown>
-          <Button pill size="xl" onClick={() => refreshData()}>Refresh</Button>
-          <Button
-            pill
-            size="xl"
-            type="button"
-            className="sj-action-pill"
-            disabled={selectedGanttIds.size === 0}
-            onClick={handleEditGantt}
-          >
+          <Button pill type="button" className="sj-action-pill" onClick={() => refreshData()}>
+            Refresh
+          </Button>
+          <Button pill type="button" className="sj-action-pill" disabled={selectedGanttIds.size === 0} onClick={handleEditGantt}>
             Edit selected
           </Button>
           {hasFilters && (
@@ -650,7 +586,7 @@ function Gantt() {
               className="font-sans font-semibold text-sj-control leading-tight text-sjblue underline decoration-2 underline-offset-4 hover:text-sjred"
               onClick={clearFilters}
             >
-              Clear column filters
+              Clear filters
             </button>
           )}
         </div>
@@ -667,10 +603,10 @@ function Gantt() {
               <strong className="font-semibold text-black">{draftsCount}</strong>
               <span className="text-black/80">
                 {' '}
-                draft{draftsCount === 1 ? '' : 's'} waiting
+                update{draftsCount === 1 ? '' : 's'} awaiting approval
               </span>
               {hasFilters ? (
-                <span className="text-black/70"> (column filters)</span>
+                <span className="text-black/70"> (filters on)</span>
               ) : null}
             </p>
           ) : tasks.length > 0 ? (
@@ -680,7 +616,7 @@ function Gantt() {
               <strong className="font-semibold text-black">{draftsCount}</strong>
               <span className="text-black/80">
                 {' '}
-                draft{draftsCount === 1 ? '' : 's'} waiting
+                update{draftsCount === 1 ? '' : 's'} awaiting approval
               </span>
             </p>
           )}
@@ -690,24 +626,21 @@ function Gantt() {
       <div className="gantt-chart-root relative z-0 flex min-h-0 min-w-0 flex-1 basis-0 flex-col overflow-hidden bg-white">
         {layout ? (
           <>
-            {/* Fixed-height header: thead + timeline (horizontal scroll synced with body). */}
-            <div className="flex min-h-0 min-w-0 shrink-0 items-stretch border-b border-black/10 bg-white">
+            <div className="flex min-h-0 min-w-0 shrink-0 items-stretch bg-white">
               <div
-                className="shrink-0 border-r border-black/10 bg-white"
+                className="shrink-0 bg-white"
                 style={{ width: FROZEN_PANEL_WIDTH }}
                 aria-label="Task identifiers"
               >
                 <table className="w-full table-fixed text-left text-black">
                   {FROZEN_COLGROUP}
-                  <thead className="bg-black/10 text-black">
+                  <thead className="bg-sjblue/[0.05] text-black">
                     <tr>
                       <th
                         className={`${thLabelClass} box-border align-middle text-center`}
                         style={{ height: GANTT_HEADER_ROW1_PX, boxSizing: 'border-box' }}
                       >
-                        <span className="flex w-full flex-col items-center justify-center font-sans text-sj-body font-semibold leading-tight text-black">
-                          Select All
-                        </span>
+                        <span className="sr-only">Selection</span>
                       </th>
                       <th
                         className={`${thLabelClass} box-border`}
@@ -806,8 +739,38 @@ function Gantt() {
                   >
                     <rect className="fill-white" x={0} y={0} width={layout.width} height={GANTT_CHART_HEADER_PX} />
                     {layout.days.map((d, i) => {
-                      const { line1, line2 } = ganttHeaderPair(viewMode, d);
+                      const tick = timelineTickLabels(viewMode, d);
                       const cx = i * layout.columnWidth + layout.columnWidth / 2;
+                      if (tick.kind === 'day') {
+                        return (
+                          <g key={i}>
+                            <text
+                              x={cx}
+                              y={GANTT_HEADER_LINE1_Y}
+                              textAnchor="middle"
+                              className="gantt-header-line1"
+                            >
+                              {tick.dow}
+                            </text>
+                            <text
+                              x={cx}
+                              y={GANTT_HEADER_LINE2_DAY_MONTH_Y}
+                              textAnchor="middle"
+                              className="gantt-header-line2"
+                            >
+                              {tick.month}
+                            </text>
+                            <text
+                              x={cx}
+                              y={GANTT_HEADER_LINE3_DAY_DAY_Y}
+                              textAnchor="middle"
+                              className="gantt-header-line3"
+                            >
+                              {tick.day}
+                            </text>
+                          </g>
+                        );
+                      }
                       return (
                         <g key={i}>
                           <text
@@ -816,7 +779,7 @@ function Gantt() {
                             textAnchor="middle"
                             className="gantt-header-line1"
                           >
-                            {line1}
+                            {tick.line1}
                           </text>
                           <text
                             x={cx}
@@ -824,7 +787,7 @@ function Gantt() {
                             textAnchor="middle"
                             className="gantt-header-line2"
                           >
-                            {line2}
+                            {tick.line2}
                           </text>
                         </g>
                       );
@@ -834,14 +797,13 @@ function Gantt() {
               </div>
             </div>
 
-            {/* Body fills remaining viewport height; only this region scrolls vertically. */}
             <div
               ref={bodyScrollRef}
               className="gantt-body-scroll min-h-0 min-w-0 flex-1 basis-0 overflow-auto"
             >
             <div className="flex min-w-min items-stretch">
               <div
-                className="sticky left-0 z-20 shrink-0 border-r border-black/10 bg-white"
+                className="sticky left-0 z-20 shrink-0 bg-white"
                 style={{ width: FROZEN_PANEL_WIDTH }}
               >
                 <table className="w-full table-fixed text-left text-black">
@@ -851,18 +813,21 @@ function Gantt() {
                       const isPri = b.task_id === rowHighlight.primaryId;
                       const isPred = rowHighlight.predIds.has(b.task_id);
                       const isSucc = rowHighlight.succIds.has(b.task_id);
-                      let trCls = 'border-b border-black/5 transition-colors ';
-                      if (isPri) trCls += 'bg-sjblue/15 ring-1 ring-inset ring-sjblue/30';
+                      let trCls = 'transition-colors ';
+                      if (isPri) trCls += 'bg-sjblue/15';
                       else if (isPred || isSucc) trCls += 'bg-sjblue/10';
-                      else trCls += 'hover:bg-black/5';
+                      else trCls += 'hover:bg-sjblue/[0.04]';
                       return (
                       <tr
                         key={`frozen-${b.task_id}`}
-                        className={trCls}
+                        className={`${trCls} box-border`}
                         style={{ height: layout.rowHeight }}
                       >
-                        <td className="px-2 py-2 align-middle text-center whitespace-nowrap">
-                          <div className="flex items-center justify-center">
+                        <td
+                          className="box-border px-2 align-middle text-center whitespace-nowrap leading-none"
+                          style={{ height: layout.rowHeight, paddingTop: 0, paddingBottom: 0 }}
+                        >
+                          <div className="flex h-full min-h-0 items-center justify-center">
                             <Checkbox
                               aria-label={`Select task ${b.task_id}`}
                               checked={selectedGanttIds.has(b.task_id)}
@@ -870,13 +835,22 @@ function Gantt() {
                             />
                           </div>
                         </td>
-                        <td className="px-2 py-2 align-middle whitespace-nowrap">
+                        <td
+                          className="box-border px-2 align-middle whitespace-nowrap leading-none"
+                          style={{ height: layout.rowHeight, paddingTop: 0, paddingBottom: 0 }}
+                        >
                           {b.project_id || '—'}
                         </td>
-                        <td className="max-w-0 min-w-0 px-2 py-2 align-middle">
+                        <td
+                          className="max-w-0 min-w-0 box-border px-2 align-middle leading-none"
+                          style={{ height: layout.rowHeight, paddingTop: 0, paddingBottom: 0 }}
+                        >
                           <span className="block truncate">{b.task_title}</span>
                         </td>
-                        <td className="px-2 py-2 align-middle text-center whitespace-nowrap font-semibold tabular-nums">
+                        <td
+                          className="box-border px-2 align-middle text-center whitespace-nowrap font-semibold tabular-nums leading-none"
+                          style={{ height: layout.rowHeight, paddingTop: 0, paddingBottom: 0 }}
+                        >
                           {ownerInitials(b.owner_name, b.owner_id)}
                         </td>
                       </tr>
@@ -964,10 +938,7 @@ function Gantt() {
                       )}
                     </g>
                   )}
-                  {/*
-                    Native SVG rects (not Flowbite Progress) so stroke + markers paint first;
-                    opaque fills sit above dependency paths in document order (avoids SVG/HTML compositing).
-                  */}
+                  {/* Bars after dependency paths so opaque fills cover connectors (SVG paint order). */}
                   <g className="gantt-bars" aria-hidden>
                     {layout.bars.map((b) => {
                       const bh = DEFAULT_OPTIONS.bar_height;
@@ -1032,7 +1003,7 @@ function Gantt() {
                     style={{ position: 'absolute', left: tooltipPos.left, top: tooltipPos.top, width: tooltipWidth }}
                     className="gantt-tooltip-card pointer-events-auto z-[40]"
                   >
-                    <Card className="w-full rounded-none border border-black/10 bg-white p-3 shadow-none">
+                    <Card className="w-full rounded-xl border-0 bg-white p-3 shadow-none ring-0">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1 font-sans text-sj-body text-black">
                           <div>{tooltipBar.owner_name || '—'}</div>
@@ -1040,7 +1011,7 @@ function Gantt() {
                             {date_utils.format(tooltipBar.planned_start)} →{' '}
                             {date_utils.format(tooltipBar.planned_due)}
                           </div>
-                          <div className="mt-2 font-semibold text-black/70">Predecessors</div>
+                          <div className="mt-2 font-semibold text-black/70">Tasks this depends on</div>
                           <div className="break-words">
                             {preds.length === 0 ? (
                               '—'
@@ -1068,7 +1039,7 @@ function Gantt() {
                               ))
                             )}
                           </div>
-                          <div className="mt-1 font-semibold text-black/70">Successors</div>
+                          <div className="mt-1 font-semibold text-black/70">Tasks waiting on this one</div>
                           <div className="break-words">
                             {succs.length === 0 ? (
                               '—'
@@ -1112,7 +1083,9 @@ function Gantt() {
                         ) : null}
                       </div>
                       {!pinnedHere ? (
-                        <p className="mb-0 mt-2 font-sans text-sj-body text-black/50">Click bar to pin</p>
+                        <p className="mb-0 mt-2 font-sans text-sj-body text-black/50">
+                          Click the bar on the chart to keep this summary open.
+                        </p>
                       ) : null}
                     </Card>
                   </div>

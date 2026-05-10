@@ -1,16 +1,93 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Spinner, Button } from 'flowbite-react'
+import { Spinner, Button, FileInput, Label } from 'flowbite-react'
 import DraftsDataTable from './DraftsDataTable'
+import { formatTasksAsEditPrefill } from './utils/gantt_config'
 
 // Key must match Gantt.jsx (bulk edit prefill from View page).
 const EDIT_PREFILL_STORAGE_KEY = 'sj-edit-prefill-v1'
 
-// Visual playback controls for streamed progress.
 // Increase these to slow down the appearance of boxes for review/tweaking.
 const STREAM_BOX_DELAY_MS = 1_000
 const STREAM_AFTER_ALL_DELAY_MS = 1_000
 
-/** One streamed SSE payload rendered as a chat-style box (see App.css). */
+// Allowed file input extensions
+const ATTACH_ACCEPT = '.eml,.txt,.vtt,.ics,.csv,.tsv,.md,.xml'
+// Per-file cap so a stray multi-MB MS Project XML doesn't choke the textarea.
+const ATTACH_MAX_BYTES = 2 * 1024 * 1024
+
+function appendFilesToMessage(prev, addition) {
+  const add = addition.trim()
+  if (!add) return prev
+  if (!prev || !prev.trim()) return `${add}\n`
+  return `${prev.replace(/\s+$/, '')}\n\n${add}\n`
+}
+
+function FileAttachInput({ id, onAppend, disabled }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleChange(event) {
+    const files = Array.from(event.target.files ?? [])
+    if (!files.length) {
+      return
+    }
+    setBusy(true)
+    setError('')
+    const parts = []
+    const skipped = []
+    try {
+      for (const file of files) {
+        if (file.size > ATTACH_MAX_BYTES) {
+          skipped.push(`${file.name} (too large)`)
+          continue
+        }
+        try {
+          const text = await file.text()
+          parts.push(`[file: ${file.name}]\n${text.trim()}`)
+        } catch {
+          skipped.push(`${file.name} (could not be read)`)
+        }
+      }
+      if (parts.length) onAppend(parts.join('\n\n'))
+      if (skipped.length) setError(`Skipped: ${skipped.join(', ')}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const isDisabled = disabled || busy
+
+  return (
+    <div className="flex w-full flex-col gap-1">
+      <span className="block font-sans text-sj-body font-medium text-black/70">
+        Attach files (optional)
+      </span>
+      <Label
+        htmlFor={id}
+        className={`inline-flex w-fit max-w-full items-center ${
+          isDisabled ? 'pointer-events-none opacity-60' : 'cursor-pointer'
+        }`}
+      >
+        <span className="inline-flex shrink-0 items-center justify-center rounded-lg bg-sjblue px-4 py-2 font-sans text-sj-body font-semibold text-white transition-colors hover:bg-sjblue/85">
+          Choose files
+        </span>
+        <FileInput
+          id={id}
+          multiple
+          accept={ATTACH_ACCEPT}
+          disabled={isDisabled}
+          onChange={handleChange}
+          className="hidden"
+        />
+      </Label>
+      <p className="m-0 mt-1 font-sans text-sj-body text-black/55">
+        Supported: Outlook .eml/.txt - Teams .vtt - Calendar .ics - Excel .csv/.tsv - OneNote .md/.txt - Project .xml
+      </p>
+      {error ? <p className="error m-0 text-left">{error}</p> : null}
+    </div>
+  )
+}
+
 function StreamBubble({ event: ev }) {
   if (ev.kind === 'user') {
     return (
@@ -24,9 +101,9 @@ function StreamBubble({ event: ev }) {
   if (ev.kind === 'status') {
     const labels = {
       starting: 'Starting…',
-      formatting: 'Analyzing with AI…',
-      writing_drafts: 'Writing drafts to the database…',
-      done: 'Formatting complete.',
+      formatting: 'Drafting your input into trackable tasks...',
+      writing_drafts: 'Saving drafts for review…',
+      done: 'Ready when you are — review the drafts in the table below.',
     }
     const label = labels[ev.phase] ?? ev.phase ?? 'Working…'
     return (
@@ -38,7 +115,7 @@ function StreamBubble({ event: ev }) {
     )
   }
   if (ev.kind === 'agent') {
-    const author = ev.author ?? 'Agent'
+    const author = ev.author ?? 'Assistant'
     const text = ev.text ?? ''
     return (
       <div className="sj-chat-row">
@@ -56,7 +133,7 @@ function StreamBubble({ event: ev }) {
       <div className="sj-chat-row">
         <div className="sj-chat-box sj-chat-box--db max-w-[min(100%,72rem)]">
           <span className="sj-chat-title">
-            Queries to database: {n} row{n === 1 ? '' : 's'}
+            Saved for review: {n} draft{n === 1 ? '' : 's'}
           </span>
           <span className="sj-chat-body sj-chat-body--mono">{q}</span>
         </div>
@@ -72,7 +149,16 @@ function StreamBubble({ event: ev }) {
   )
 }
 
-function SubmitUpdate({ apiBaseUrl, refreshDrafts, onStreamingChange }) {
+function SubmitUpdate({
+  apiBaseUrl,
+  refreshDrafts,
+  hasPendingDrafts,
+  draftsPanel,
+  followUpComposerOpen = false,
+  followUpPrefill = '',
+  onCloseFollowUpComposer,
+  onStreamingChange,
+}) {
   const [message, setMessage] = useState(() => {
     try {
       const raw = sessionStorage.getItem(EDIT_PREFILL_STORAGE_KEY)
@@ -91,6 +177,8 @@ function SubmitUpdate({ apiBaseUrl, refreshDrafts, onStreamingChange }) {
   const abortRef = useRef(null)
   const lastBoxRef = useRef(null)
   const streamViewportRef = useRef(null)
+  const followUpComposerRef = useRef(null)
+  const prevFollowUpOpen = useRef(false)
   const playbackRef = useRef({
     queue: [],
     processing: false,
@@ -122,16 +210,21 @@ function SubmitUpdate({ apiBaseUrl, refreshDrafts, onStreamingChange }) {
       if (!state.cancelled && state.finalSeen && state.queue.length === 0) {
         await sleep(STREAM_AFTER_ALL_DELAY_MS)
         if (state.cancelled) return
-        await refreshDrafts()
+        const draftCount = await refreshDrafts()
         setMessage('')
-        setStreamEvents([])
-        setPhase('idle')
         onStreamingChange?.(false)
+        if (draftCount > 0) {
+          setPhase('review')
+        } else {
+          setStreamEvents([])
+          setPhase('idle')
+        }
       }
     } finally {
-      playbackRef.current.processing = false
-      if (!playbackRef.current.cancelled && playbackRef.current.needsRerun) {
-        playbackRef.current.needsRerun = false
+      // Must use captured `state`: `playbackRef.current` may already point at the next run.
+      state.processing = false
+      if (!state.cancelled && state.needsRerun) {
+        state.needsRerun = false
         void processPlaybackQueue()
       }
     }
@@ -151,10 +244,43 @@ function SubmitUpdate({ apiBaseUrl, refreshDrafts, onStreamingChange }) {
   }, [])
 
   useEffect(() => {
+    if (!hasPendingDrafts && phase === 'review') {
+      queueMicrotask(() => {
+        setStreamEvents([])
+        setPhase('idle')
+      })
+    }
+  }, [hasPendingDrafts, phase])
+
+  useEffect(() => {
+    if (followUpComposerOpen && followUpPrefill !== '') {
+      queueMicrotask(() => {
+        setMessage(followUpPrefill)
+      })
+    }
+  }, [followUpComposerOpen, followUpPrefill])
+
+  useEffect(() => {
+    if (prevFollowUpOpen.current && !followUpComposerOpen) {
+      queueMicrotask(() => {
+        setMessage('')
+      })
+    }
+    prevFollowUpOpen.current = followUpComposerOpen
+  }, [followUpComposerOpen])
+
+  useEffect(() => {
+    if (!followUpComposerOpen) return
+    const id = requestAnimationFrame(() => {
+      followUpComposerRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' })
+    })
+    return () => cancelAnimationFrame(id)
+  }, [followUpComposerOpen])
+
+  useEffect(() => {
     const node = lastBoxRef.current
     if (!node) return
-    // Prefer aligning the start of the newest message (author/title line is most important).
-    node.scrollIntoView({ block: 'start' })
+    node.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [streamEvents.length])
 
   const streaming = phase === 'streaming'
@@ -168,6 +294,8 @@ function SubmitUpdate({ apiBaseUrl, refreshDrafts, onStreamingChange }) {
     setPhase('streaming')
     onStreamingChange?.(true)
     setSubmitError('')
+    onCloseFollowUpComposer?.()
+    setMessage('')
     playbackRef.current = {
       queue: [],
       processing: false,
@@ -175,7 +303,7 @@ function SubmitUpdate({ apiBaseUrl, refreshDrafts, onStreamingChange }) {
       finalSeen: false,
       needsRerun: false,
     }
-    setStreamEvents([{ kind: 'user', text: trimmed }])
+    setStreamEvents((prev) => [...prev, { kind: 'user', text: trimmed }])
 
     const ac = new AbortController()
     abortRef.current = ac
@@ -195,7 +323,7 @@ function SubmitUpdate({ apiBaseUrl, refreshDrafts, onStreamingChange }) {
       const contentType = response.headers.get('content-type') || ''
 
       if (!response.ok) {
-        let detail = 'Submit failed. Please try again.'
+        let detail = 'We could not send this update. Please try again.'
         if (contentType.includes('application/json')) {
           const errJson = await response.json()
           detail =
@@ -256,64 +384,123 @@ function SubmitUpdate({ apiBaseUrl, refreshDrafts, onStreamingChange }) {
       }
     } catch (error) {
       if (error?.name === 'AbortError') {
-        setPhase('idle')
-        setStreamEvents([])
         onStreamingChange?.(false)
+        setPhase(hasPendingDrafts ? 'review' : 'idle')
         return
       }
-      setSubmitError(error.message || 'Submit failed. Please try again.')
-      setPhase('idle')
-      setStreamEvents([])
       onStreamingChange?.(false)
+      setSubmitError(error.message || 'We could not send this update. Please try again.')
+      setPhase(hasPendingDrafts ? 'review' : 'idle')
     } finally {
       abortRef.current = null
     }
   }
 
-  if (streaming) {
+  const inChatShell = streaming || phase === 'review' || hasPendingDrafts
+
+  if (!inChatShell) {
     return (
-      <section className="compose-block" aria-label="AI progress" aria-live="polite">
-        <div
-          ref={streamViewportRef}
-          className="flex max-h-[min(55vh,28rem)] min-h-0 flex-col gap-2 overflow-y-auto pr-1"
-        >
-          {streamEvents.map((ev, i) => {
-            const isLast = i === streamEvents.length - 1
-            return (
-              <div key={i} ref={isLast ? lastBoxRef : null}>
-                <StreamBubble event={ev} />
-              </div>
-            )
-          })}
+      <section className="compose-block" aria-label="Project update input">
+        <p className="sj-compose-lede m-0">
+          <strong className="font-semibold text-sjblue">Get in The Loop.</strong> Create or update tasks you'd like to be trackable. Feel free to type, copy, or upload meeting notes, emails, chats, etc. Our agents will check your input against existing tasks and format drafts appropriately for the database. You get to choose to edit, accept, or discard these drafts before they show up in the tracker.
+        </p>
+        <textarea
+          id="message-input"
+          className="message-input"
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+          placeholder="Type your project actionables here. Example: Meeting Summary for Harbour Bridge Expansion. Key updates: Confirm owner for weekly update (tentative: Aisha Ong). Shift MEP riser sketch from 2026-04-15 to 2026-04-19. Mark coordination model as blocked pending survey"
+        />
+        <FileAttachInput
+          id="landing-file-attach"
+          disabled={streaming}
+          onAppend={(text) => setMessage((prev) => appendFilesToMessage(prev, text))}
+        />
+        <div className="flex justify-center">
+          <Button
+            pill
+            type="button"
+            className="sj-action-pill"
+            disabled={!message.trim() || streaming}
+            onClick={handleSubmit}
+          >
+            <>
+              Submit <span aria-hidden="true">↓</span>
+            </>
+          </Button>
         </div>
+        {submitError && <p className="error submit-error">{submitError}</p>}
       </section>
     )
   }
 
+  const showFollowUpComposer = followUpComposerOpen && !streaming
+
   return (
-    <section className="compose-block" aria-label="Project update input">
-      <textarea
-        id="message-input"
-        className="message-input"
-        type="text"
-        value={message}
-        onChange={(event) => setMessage(event.target.value)}
-        placeholder="Type your project updates here"
-      />
-      <div className="flex justify-end">
-        <Button
-          pill
-          type="button"
-          className="sj-action-pill"
-          disabled={!message.trim() || streaming}
-          onClick={handleSubmit}
-        >
-          <>
-            Submit <span aria-hidden="true">→</span>
-          </>
-        </Button>
+    <section
+      className="compose-block compose-block--chat flex min-w-0"
+      aria-label={streaming ? 'Update in progress' : 'Project update assistant'}
+      aria-live="polite"
+    >
+      <div ref={streamViewportRef} className="sj-chat-scroll pr-0.5">
+        {hasPendingDrafts && streamEvents.length === 0 && !streaming ? (
+          <div className="sj-chat-row">
+            <div className="sj-chat-box sj-chat-box--status max-w-[min(100%,56rem)]">
+              <span className="sj-chat-body">
+                You have drafted tasks waiting for review below. Select rows and click Edit, Accept, or Discard.
+              </span>
+            </div>
+          </div>
+        ) : null}
+        {streamEvents.map((ev, i) => {
+          const isLast = i === streamEvents.length - 1
+          return (
+            <div key={i} ref={isLast ? lastBoxRef : null}>
+              <StreamBubble event={ev} />
+            </div>
+          )
+        })}
+        {draftsPanel}
+        {showFollowUpComposer ? (
+          <div ref={followUpComposerRef} className="flex shrink-0 flex-col gap-2 bg-sj-surface">
+            <textarea
+              id="message-input"
+              className="message-input message-input--followup"
+              type="text"
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              placeholder="Edit the task fields in this note, then submit…"
+            />
+            <FileAttachInput
+              id="followup-file-attach"
+              disabled={streaming}
+              onAppend={(text) => setMessage((prev) => appendFilesToMessage(prev, text))}
+            />
+            <div className="flex flex-wrap justify-center gap-3">
+              <Button
+                pill
+                type="button"
+                className="sj-action-pill--outline"
+                onClick={() => onCloseFollowUpComposer?.()}
+              >
+                Cancel
+              </Button>
+              <Button
+                pill
+                type="button"
+                className="sj-action-pill"
+                disabled={!message.trim()}
+                onClick={handleSubmit}
+              >
+                <>
+                  Submit <span aria-hidden="true">↓</span>
+                </>
+              </Button>
+            </div>
+          </div>
+        ) : null}
+        {submitError ? <p className="error submit-error shrink-0">{submitError}</p> : null}
       </div>
-      {submitError && <p className="error submit-error">{submitError}</p>}
     </section>
   )
 }
@@ -321,24 +508,17 @@ function SubmitUpdate({ apiBaseUrl, refreshDrafts, onStreamingChange }) {
 function confirmRejectDrafts(selectedCount, totalDraftCount) {
   const n = selectedCount
   const lines = [
-    `You are about to permanently remove ${n} draft row${n === 1 ? '' : 's'} from the approval queue.`,
-    'This does not change tasks that are already on the Gantt chart.',
+    `You are about to permanently discard ${n} draft${n === 1 ? '' : 's'} that ${n === 1 ? 'has' : 'have'} not been approved yet.`,
+    'Items already on the published schedule will stay as they are.',
     'This cannot be undone.',
   ]
   if (!window.confirm(lines.join('\n\n'))) {
     return false
   }
-  const bulk = n >= 5 || n === totalDraftCount
-  if (bulk) {
-    const second = window.confirm(
-      `Second check: That's more than 5 drafts! Do you really want to reject ${n} draft${n === 1 ? '' : 's'}?`,
-    )
-    if (!second) return false
-  }
   return true
 }
 
-function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts }) {
+function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts, onEditSelected, hideDraftsTable = false }) {
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [isCommitting, setIsCommitting] = useState(false)
   const [isRejecting, setIsRejecting] = useState(false)
@@ -390,14 +570,14 @@ function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts }) {
       const data = await response.json()
 
       if (!response.ok) {
-        const errorMessage = data?.detail || 'Commit failed. Please try again.'
+        const errorMessage = data?.detail || 'Could not apply your approval. Please try again.'
         throw new Error(errorMessage)
       }
 
       setSelectedIds(new Set())
       await refreshDrafts()
     } catch (error) {
-      setCommitError(error.message || 'Commit failed. Please try again.')
+      setCommitError(error.message || 'Could not apply your approval. Please try again.')
     } finally {
       setIsCommitting(false)
     }
@@ -428,7 +608,7 @@ function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts }) {
       const data = await response.json()
 
       if (!response.ok) {
-        let errorMessage = 'Reject failed. Please try again.'
+        let errorMessage = 'Could not discard those suggestions. Please try again.'
         const d = data?.detail
         if (typeof d === 'string') {
           errorMessage = d
@@ -441,7 +621,7 @@ function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts }) {
       setSelectedIds(new Set())
       await refreshDrafts()
     } catch (error) {
-      setCommitError(error.message || 'Reject failed. Please try again.')
+      setCommitError(error.message || 'Could not discard those suggestions. Please try again.')
     } finally {
       setIsRejecting(false)
     }
@@ -449,23 +629,36 @@ function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts }) {
 
   const busy = isCommitting || isRejecting
 
+  function handleEditSelectedRows() {
+    if (selectedIds.size === 0 || busy) return
+    const list = drafts.filter((d) => selectedIds.has(d.task_id))
+    if (!list.length) return
+    onEditSelected?.(formatTasksAsEditPrefill(list))
+  }
+
   return (
-    <section className="drafts-block" aria-label="Approval workspace">
-      <div className="drafts-container">
-        {drafts.length === 0 ? (
-          <p className="no-drafts">No drafts to approve. Try submitting project updates to AI via the input box above.</p>
-        ) : (
-          <DraftsDataTable
-            drafts={drafts}
-            selectedIds={selectedIds}
-            onToggle={toggleDraftSelection}
-            onToggleAllFiltered={toggleSelectAllFiltered}
-          />
-        )}
-      </div>
-      {drafts.length > 0 ? (
+    <section className="flex min-w-0 flex-col gap-3" aria-label="Review drafted tasks">
+      {drafts.length === 0 || hideDraftsTable ? null : (
+        <DraftsDataTable
+          drafts={drafts}
+          selectedIds={selectedIds}
+          onToggle={toggleDraftSelection}
+          onToggleAllFiltered={toggleSelectAllFiltered}
+          layout="embedded"
+        />
+      )}
+      {drafts.length > 0 && !hideDraftsTable ? (
         <div className="approve-actions">
           <div className="flex w-full flex-wrap justify-end gap-3">
+            <Button
+              pill
+              type="button"
+              className="sj-action-pill--outline"
+              disabled={selectedIds.size === 0 || busy}
+              onClick={handleEditSelectedRows}
+            >
+              {`Edit (${selectedIds.size})`}
+            </Button>
             <Button
               pill
               type="button"
@@ -473,7 +666,7 @@ function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts }) {
               disabled={selectedIds.size === 0 || busy}
               onClick={handleCommit}
             >
-              {isCommitting ? 'Committing...' : `Approve (${selectedIds.size})`}
+              {isCommitting ? 'Applying…' : `Accept (${selectedIds.size})`}
             </Button>
             <Button
               pill
@@ -482,7 +675,7 @@ function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts }) {
               disabled={selectedIds.size === 0 || busy}
               onClick={handleReject}
             >
-              {isRejecting ? 'Removing...' : `Reject (${selectedIds.size})`}
+              {isRejecting ? 'Discarding…' : `Discard (${selectedIds.size})`}
             </Button>
           </div>
           {commitError ? <p className="error submit-error mt-2 w-full text-right">{commitError}</p> : null}
@@ -497,8 +690,20 @@ function ApproveUpdate({ apiBaseUrl, drafts, refreshDrafts }) {
 export default function ProjectUpdateManager() {
   const [drafts, setDrafts] = useState([])
   const [loading, setLoading] = useState(true)
-  const [isStreaming, setIsStreaming] = useState(false)
+  const [followUpComposerOpen, setFollowUpComposerOpen] = useState(false)
+  const [followUpPrefill, setFollowUpPrefill] = useState('')
+  const [chatStreaming, setChatStreaming] = useState(false)
   const apiBaseUrl = import.meta.env.DEV ? 'http://localhost:8000' : ''
+
+  const closeFollowUpComposer = useCallback(() => {
+    setFollowUpComposerOpen(false)
+    setFollowUpPrefill('')
+  }, [])
+
+  const handleEditDraftsSelected = useCallback((text) => {
+    setFollowUpPrefill(text)
+    setFollowUpComposerOpen(true)
+  }, [])
 
   const fetchDrafts = useCallback(async () => {
     setLoading(true)
@@ -506,9 +711,12 @@ export default function ProjectUpdateManager() {
       const response = await fetch(`${apiBaseUrl}/api/drafts`)
       if (!response.ok) throw new Error('Failed to fetch drafts')
       const data = await response.json()
-      setDrafts(Array.isArray(data) ? data : [])
+      const arr = Array.isArray(data) ? data : []
+      setDrafts(arr)
+      return arr.length
     } catch (error) {
       console.error('Error fetching drafts:', error)
+      return 0
     } finally {
       setLoading(false)
     }
@@ -521,13 +729,41 @@ export default function ProjectUpdateManager() {
     return () => clearTimeout(t)
   }, [fetchDrafts])
 
+  useEffect(() => {
+    if (drafts.length === 0 && followUpComposerOpen) {
+      queueMicrotask(() => {
+        closeFollowUpComposer()
+      })
+    }
+  }, [drafts.length, followUpComposerOpen, closeFollowUpComposer])
+
+  const draftsPanel =
+    drafts.length > 0 ? (
+      <ApproveUpdate
+        apiBaseUrl={apiBaseUrl}
+        drafts={drafts}
+        refreshDrafts={fetchDrafts}
+        onEditSelected={handleEditDraftsSelected}
+        hideDraftsTable={followUpComposerOpen || chatStreaming}
+      />
+    ) : null
+
+  const followUpProps = {
+    followUpComposerOpen,
+    followUpPrefill,
+    onCloseFollowUpComposer: closeFollowUpComposer,
+    onStreamingChange: setChatStreaming,
+  }
+
   if (loading) {
     return (
       <main>
         <SubmitUpdate
           apiBaseUrl={apiBaseUrl}
           refreshDrafts={fetchDrafts}
-          onStreamingChange={setIsStreaming}
+          hasPendingDrafts={drafts.length > 0}
+          draftsPanel={draftsPanel}
+          {...followUpProps}
         />
         <div className="flex items-center justify-center p-4">
           <Spinner className="h-10 w-10 md:h-12 md:w-12" />
@@ -541,11 +777,10 @@ export default function ProjectUpdateManager() {
       <SubmitUpdate
         apiBaseUrl={apiBaseUrl}
         refreshDrafts={fetchDrafts}
-        onStreamingChange={setIsStreaming}
+        hasPendingDrafts={drafts.length > 0}
+        draftsPanel={draftsPanel}
+        {...followUpProps}
       />
-      {isStreaming ? null : (
-        <ApproveUpdate apiBaseUrl={apiBaseUrl} drafts={drafts} refreshDrafts={fetchDrafts} />
-      )}
     </main>
   )
 }

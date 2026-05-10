@@ -2,49 +2,55 @@
 @source "../.flowbite-react/class-list.json";
 @import "flowbite-react/plugin/tailwindcss";
 
+@import "@fontsource/metropolis/400.css";
 @import "@fontsource/metropolis/500.css";
+@import "@fontsource/metropolis/600.css";
+@import "@fontsource/metropolis/700.css";
 @import "@fontsource/metropolis/800.css";
 
 
 @theme {
   --color-sjblue: #1257FD;
   --color-sjred: #ED2024;
-  --font-sans: Metropolis, Montserrat, system-ui, sans-serif;
-  --font-mono: ui-monospace, Consolas, monospace;
+  --color-sj-surface: #f5f7fc;
+  --color-sj-surface-elevated: #ffffff;
+  --font-sans: Metropolis, system-ui, sans-serif;
+  --font-mono: Metropolis, system-ui, sans-serif;
 
-  /**
-   * sj-body: tables + Gantt grid copy. sj-control: pill / chrome (matches Flowbite buttons).
-   * Tailwind v4 generates `text-sj-body` / `text-sj-control` from these tokens.
-   */
-  --text-sj-body: clamp(0.6875rem, 0.14vw + 0.64rem, 0.8125rem);
-  --text-sj-body--line-height: 1.4;
-  --text-sj-control: clamp(0.625rem, 0.32vw + 0.48rem, 0.875rem);
-  --text-sj-control--line-height: 1.2;
+  --text-sj-body: clamp(0.9375rem, 0.35vw + 0.75rem, 1.125rem);
+  --text-sj-body--line-height: 1.45;
+  --text-sj-control: clamp(0.875rem, 0.5vw + 0.65rem, 1.1875rem);
+  --text-sj-control--line-height: 1.25;
 }
 
 @layer components {
   .sj-text-h2 {
     @apply font-sans font-semibold text-sj-control leading-tight;
   }
+
+  .sj-compose-lede {
+    @apply m-0 min-w-0 w-full max-w-none font-sans text-sj-body leading-snug text-black/70;
+  }
 }
 
 @layer base {
-  /* Document headings (navbar brand / nav links keep their own classes). */
+  /* Navbar brand / nav links keep their own classes. */
   h1 {
-    @apply font-sans text-xl md:text-2xl;
+    @apply font-sans text-3xl md:text-4xl;
   }
 
   body {
     margin: 0;
     min-height: 100svh;
     letter-spacing: 0.18px;
-    @apply bg-white font-sans text-sj-body text-black;
+    @apply bg-sj-surface font-sans text-sj-body text-black;
   }
 
 }
 
 
 :root {
+  font-family: Metropolis, system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

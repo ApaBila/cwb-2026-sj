@@ -183,7 +183,7 @@ const FULL_COLUMNS = [
   {
     id: 'dependency',
     accessorKey: 'dependency',
-    header: 'Dependency',
+    header: 'Depends on',
     cell: (info) => info.getValue() || '—',
     filterFn: includesTextFilter,
     sortingFn: 'alphanumeric',
@@ -209,7 +209,7 @@ const FULL_COLUMNS = [
   {
     id: 'action_type',
     accessorKey: 'action_type',
-    header: 'Action Type',
+    header: 'Type of change',
     cell: (info) => String(info.getValue() ?? '').replace(/_/g, ' ') || '—',
     filterFn: includesTextFilter,
     sortingFn: sortByOrdinalMap(ACTION_TYPE_SORT_ORDER),
@@ -323,7 +323,8 @@ export default function DraftsDataTable({
   const minWidth =
     variant === 'unscheduled' ? UNSCHEDULED_TABLE_MIN_WIDTH_PX : DRAFTS_TABLE_MIN_WIDTH_PX;
   const colgroup = variant === 'unscheduled' ? UNSCHEDULED_COLGROUP : DRAFTS_COLGROUP;
-  const rowLabel = variant === 'unscheduled' ? 'unscheduled tasks' : 'drafts';
+  const rowLabel =
+    variant === 'unscheduled' ? 'tasks without dates' : 'suggested updates';
   const embedFill =
     layout === 'embedded' && embeddedFillViewport;
   const wrapClass = embedFill
@@ -352,7 +353,7 @@ export default function DraftsDataTable({
             className="font-sans font-semibold text-sj-control leading-tight text-sjblue underline decoration-2 underline-offset-4 hover:text-sjred"
             onClick={clearFilters}
           >
-            Clear column filters
+            Clear filters
           </button>
         )}
       </div>
@@ -360,10 +361,10 @@ export default function DraftsDataTable({
       <div
         className={
           embedFill
-            ? 'min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-x-contain border border-black/10 bg-white'
+            ? 'min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-x-contain bg-white'
             : layout === 'embedded'
-              ? 'overflow-x-auto overflow-y-auto overscroll-x-contain border border-black/10 bg-white'
-              : 'min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-x-contain border border-black/10 bg-white'
+              ? 'overflow-x-auto overflow-y-auto overscroll-x-contain bg-white'
+              : 'min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-x-contain bg-white'
         }
       >
         <table
@@ -371,13 +372,13 @@ export default function DraftsDataTable({
           style={{ minWidth: minWidth }}
         >
           {colgroup}
-          <thead className="bg-black/10 text-black">
+          <thead className="bg-sjblue/[0.05] text-black">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
                 {hg.headers.map((header) => (
                   <th
                     key={header.id}
-                    className={`px-2 py-2 font-sans text-sj-body font-semibold whitespace-nowrap border-b border-black/10 ${header.column.id === '_select' ? 'align-middle text-center' : 'align-bottom text-left overflow-hidden'}`}
+                    className={`px-2 py-2 font-sans text-sj-body font-semibold whitespace-nowrap ${header.column.id === '_select' ? 'align-middle text-center' : 'align-bottom text-left overflow-hidden'}`}
                   >
                     {header.column.getCanSort() ? (
                       <button
@@ -431,12 +432,12 @@ export default function DraftsDataTable({
                 return (
                   <th
                     key={`f-${header.id}`}
-                    className={`px-2 pb-2 pt-1 border-b border-black/10 ${header.column.id === '_select' ? 'align-middle text-center' : 'align-top text-left'}`}
+                    className={`px-2 pb-2 pt-1 ${header.column.id === '_select' ? 'align-middle text-center' : 'align-top text-left'}`}
                   >
                     {header.column.id === '_select' ? (
                       <div className="flex items-center justify-center py-0.5">
                         <Checkbox
-                          aria-label="Select all visible drafts"
+                          aria-label="Select all visible rows"
                           checked={allSelected}
                           onChange={() => onToggleAllFiltered?.(ids)}
                         />
@@ -452,7 +453,7 @@ export default function DraftsDataTable({
                             e.target.value || undefined,
                           )
                         }
-                        className="box-border w-full min-w-[5.5rem] max-w-full border-2 border-black/20 bg-white px-1.5 py-0.5 font-sans text-sj-body font-semibold text-black placeholder:text-black/35 placeholder:font-normal focus:border-sjblue focus:outline-none"
+                        className="box-border w-full min-w-[5.5rem] max-w-full rounded-xl bg-sj-surface px-1.5 py-0.5 font-sans text-sj-body font-semibold text-black placeholder:text-black/35 placeholder:font-normal focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sjblue/50"
                       />
                     ) : null}
                   </th>
@@ -471,14 +472,14 @@ export default function DraftsDataTable({
                     ? 'No rows match the current filters.'
                     : variant === 'unscheduled'
                       ? 'No unscheduled tasks.'
-                      : 'No rows match the current filters.'}
+                      : 'No drafts.'}
                 </td>
               </tr>
             ) : (
               table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  className="border-b border-black/5 hover:bg-black/5"
+                  className="hover:bg-sjblue/[0.04]"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <td

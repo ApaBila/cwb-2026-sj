@@ -15,15 +15,27 @@ stream_progress_emit: ContextVar[StreamEmit | None] = ContextVar(
     "stream_progress_emit", default=None
 )
 
+# Sync tools (e.g. query_existing_tasks) often run off the asyncio context; ContextVar is
+# unset there. The SSE worker sets this to the same callback as stream_progress_emit.
+_stream_emit_fallback: StreamEmit | None = None
+
+
+def set_stream_progress_fallback(fn: StreamEmit | None) -> None:
+    global _stream_emit_fallback
+    _stream_emit_fallback = fn
+
+
+def clear_stream_progress_fallback() -> None:
+    global _stream_emit_fallback
+    _stream_emit_fallback = None
+
 
 def try_emit_progress(payload: dict[str, Any]) -> None:
-    fn = stream_progress_emit.get()
+    fn = stream_progress_emit.get() or _stream_emit_fallback
     if fn is not None:
         fn(payload)
 
-# https://github.com/Azure-Samples/postgres-agents/tree/main/azure-ai-agent-service
-
-
+# TODO: separate tools, use "SELECT"+append, update prompt with SOP
 @tool(approval_mode="never_require", max_invocations=7)
 def query_existing_tasks(query_str: str):
     """Tool function to query the database. 
@@ -61,7 +73,7 @@ def query_existing_tasks(query_str: str):
     )
     return json.dumps(list(result), default=str, sort_keys=True)
 
-
+#TODO: draft flip bug, separate detection vs insert to db
 def detect_changes_batched(db: Session, task_updates: list[TaskUpdate]):
     """Detects if the tasks caught by the AI are new, updates, or require clarification due to conflicts 
     based on the existing task data in Azure's PostgreSQL database. 
@@ -71,7 +83,7 @@ def detect_changes_batched(db: Session, task_updates: list[TaskUpdate]):
     if not task_updates:
         return
 
-    # Filter out schema-only fields before any database operations
+    # Filter out schema-only fields related to other tables before any operations on the table tasks
     def extract_task_data(task_update: TaskUpdate) -> dict:
         task_data = task_update.model_dump(exclude_none=True)
         task_data.pop("project_name", None)
@@ -80,11 +92,12 @@ def detect_changes_batched(db: Session, task_updates: list[TaskUpdate]):
         return task_data
 
     task_names = [t.task_title for t in task_updates]
+    # Load existing tasks
     existing_tasks = db.query(Task).filter(
         Task.task_title.in_(task_names)).all()
     existing_task_map = {task.task_title: task for task in existing_tasks}
 
-    # Pre-load referenced projects and people for validation
+    # Load referenced projects and people for validation
     project_ids = {t.project_id for t in task_updates if t.project_id}
     owner_ids = {t.owner_id for t in task_updates if t.owner_id}
 
@@ -112,24 +125,10 @@ def detect_changes_batched(db: Session, task_updates: list[TaskUpdate]):
         person_exists = task_update.owner_id in existing_person_map if task_update.owner_id else True
         entities_valid = project_exists and person_exists
 
-        # if existing_task:
-        #     if task_update.action_type in ["new_task", "conflict_needs_clarification"]:
-        #         final_action = "conflict_needs_clarification"
-        #     else:
-        #         final_action = "update"
-        # else:
-        #     if task_update.action_type in ["update", "conflict_needs_clarification"]:
-        #         final_action = "conflict_needs_clarification"
-        #     else:
-        #         final_action = "new_task"
-
-        # If referenced entities are missing, escalate to conflict
         if not entities_valid:
             print(
                 f"Referenced entities missing: project_exists={project_exists}, person_exists={person_exists}")
             final_action = "conflict_needs_clarification"
-
-        # print(f"Final action: {final_action}")
 
         try:
             task_data = extract_task_data(task_update)
@@ -139,7 +138,6 @@ def detect_changes_batched(db: Session, task_updates: list[TaskUpdate]):
                 task_data["task_id"] = f"DRAFT_{uuid.uuid4().hex[:8].upper()}"
                 print(f"Generated new task_id: {task_data['task_id']}")
 
-            # task_data["action_type"] = final_action
             task_data["is_approved"] = False
             pending_rows.append(task_data)
         except Exception as e:

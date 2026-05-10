@@ -9,7 +9,12 @@ from .database import SessionLocal
 from .services.update_formatter import format_update
 from .schemas import UpdateRequest
 from openai import APIStatusError
-from .services.change_detector import detect_changes_batched, stream_progress_emit
+from .services.change_detector import (
+    clear_stream_progress_fallback,
+    detect_changes_batched,
+    set_stream_progress_fallback,
+    stream_progress_emit,
+)
 from sqlalchemy import text, or_
 from .schemas import CommitUpdate
 from .models import Task, Dependency
@@ -24,14 +29,17 @@ app.add_middleware(
 )
 
 # API struct
-# drafts (unapproved tasks)
-# - POST to send to AI then add formatted version to task database as a draft
+
+# drafts (unaccepted tasks)
+# - POST /create to send to AI then add formatted version to task database as a draft
 # - GET to view for approval
 # - PATCH to approve, flip is_approve flag so it'll be considered (official) tasks
-# - DELETE to reject and remove draft from tasks and dependencies
+# - TODO: erase above, draft bug fix 
+# - TODO: POST /accept to delete old task if exists and change draft to official task
+# - DELETE to discard draft and delete from tasks table
+
 # (official) tasks
 # - GET to view for Gantt chart
-# TODO: allow editing official tasks
 
 # drafts/(official) tasks are both Task objects
 
@@ -97,6 +105,7 @@ async def post_drafts_stream(request_text: UpdateRequest):
     async def event_gen():
         async def worker() -> None:
             token = stream_progress_emit.set(emit_progress)
+            set_stream_progress_fallback(emit_progress)
             try:
                 emit_progress({"kind": "status", "phase": "starting"})
                 user_text = request_text.user_text
@@ -115,6 +124,7 @@ async def post_drafts_stream(request_text: UpdateRequest):
             except Exception as e:
                 await queue.put(("error", {"detail": str(e)}))
             finally:
+                clear_stream_progress_fallback()
                 stream_progress_emit.reset(token)
                 await queue.put(("end", None))
 

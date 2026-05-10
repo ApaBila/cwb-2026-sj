@@ -1,36 +1,187 @@
 @reference "./index.css";
 
+/*
+ * 1) :root — --sj-app-nav-height (chart panel clears sticky header)
+ * 2) @layer — shared: main outlet
+ * 3) @layer — shared: sj-action-pill* (Get In + Gantt toolbars)
+ * 4) @layer — shared: confidence-* (DraftsDataTable on Get In + Gantt unscheduled)
+ * 5) @layer — shared: compose-block; Get In only: compose-block--chat
+ * 6) @layer — Get In only: stream, inputs, approve bar, errors (.sj-chat-*, .message-input*, …)
+ * 7) @layer — Stay In only: gantt layout + SVG
+ */
+
 /**
- * Sticky app navbar (Flowbite + two-line brand). Used to size full-viewport panes
- * so they match the visible content column below the nav, not the whole dvh.
+ * Sticky app header + `--sj-app-nav-height`: sizes full-viewport Gantt pane below the nav.
  */
 :root {
-  --sj-app-nav-height: 5.5rem;
+  /* Centered three-column nav (see App.jsx): title + two links. */
+  --sj-app-nav-height: 5rem;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --sj-app-nav-height: 5.25rem;
+  }
 }
 
 @layer components {
+  /* —— Shared: route outlet —— */
   /**
    * Fills space below navbar (see App.jsx shell). Inner panes own vertical scroll.
    */
   main {
-    @apply flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-x-hidden bg-white p-4;
+    @apply flex min-h-0 min-w-0 flex-1 flex-col gap-8 overflow-x-hidden bg-sj-surface p-4;
   }
 
+  /* —— Shared: primary buttons (Get In + Gantt) —— */
+  /** Fixed footprint so approve / Gantt toolbar pills match (Flowbite `size` must not stretch these). */
+  .sj-action-pill {
+    @apply box-border inline-flex h-12 min-h-12 w-[15rem] shrink-0 items-center justify-center gap-2 rounded-xl border-2 border-transparent bg-sjblue px-4 font-sans text-sj-control font-semibold text-white no-underline transition-colors;
+    @apply hover:bg-white hover:border-sjblue hover:text-sjblue;
+    @apply focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sjblue;
+    @apply disabled:pointer-events-none disabled:opacity-[0.55] disabled:cursor-not-allowed;
+  }
+
+  .sj-action-pill--reject {
+    @apply box-border inline-flex h-12 min-h-12 w-[15rem] shrink-0 items-center justify-center gap-2 rounded-xl border-2 border-transparent bg-sjred px-4 font-sans text-sj-control font-semibold text-white no-underline transition-colors;
+    @apply hover:bg-white hover:border-sjred hover:text-sjred;
+    @apply focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sjred;
+    @apply disabled:pointer-events-none disabled:opacity-[0.55] disabled:cursor-not-allowed;
+  }
+
+  /** Drafts row actions: Edit → same prefill pipeline as Stay In (Gantt). */
+  .sj-action-pill--outline {
+    @apply box-border inline-flex h-12 min-h-12 w-[15rem] shrink-0 items-center justify-center gap-2 rounded-xl border-2 border-sjblue bg-white px-4 font-sans text-sj-control font-semibold text-sjblue no-underline transition-colors;
+    @apply hover:bg-sjblue/[0.06];
+    @apply focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sjblue;
+    @apply disabled:pointer-events-none disabled:opacity-[0.55] disabled:cursor-not-allowed;
+  }
+
+  /* —— Shared: drafts table badges (DraftsDataTable.jsx) —— */
+  /** Confidence badges. */
+  .confidence-badge {
+    @apply inline-flex items-center whitespace-nowrap rounded-xl px-5 py-0.5 font-sans font-semibold text-sj-body;
+  }
+
+  .confidence-high {
+    @apply bg-black/20 text-white;
+  }
+
+  .confidence-medium {
+    @apply bg-sjblue/80 text-white;
+  }
+
+  .confidence-low {
+    @apply bg-sjred/90 text-white;
+  }
+
+  /* —— Shared: compose surface (Get In landing/chat + Gantt intro lede) —— */
+  .compose-block {
+    @apply flex min-w-0 shrink-0 flex-col gap-3 rounded-xl bg-sj-surface px-4 py-4 sm:px-5 sm:py-5;
+  }
+
+  /**
+   * Get In chat shell: fill main + allow shrinking so nested TanStack table (DraftsDataTable.jsx)
+   * gets a real flex budget; plain compose-block shrink-0 collapses the grid.
+   */
+  .compose-block--chat {
+    @apply min-h-0 flex-1 shrink flex-col gap-0;
+  }
+
+  /* —— Get In only: assistant stream, forms, review bar —— */
+  /** Single column scroll: messages, table, then composer (spacing via gap, not rules). */
+  .sj-chat-scroll {
+    @apply flex min-h-0 flex-1 flex-col gap-8 overflow-x-hidden overflow-y-auto overscroll-y-contain;
+  }
+
+  .message-input--followup {
+    @apply min-h-[5rem] sm:min-h-[5.5rem];
+  }
+
+  /** Sticky bar flush with page surface (flat). */
+  .approve-actions {
+    @apply sticky bottom-0 z-30 flex shrink-0 flex-wrap justify-end gap-3 bg-sj-surface pt-3 pb-1 outline-none;
+  }
+
+  .message-input {
+    @apply box-border flex min-h-[10.75rem] w-full resize-none rounded-xl bg-white px-4 py-3.5 font-sans text-left text-sj-body text-black outline-none transition-colors placeholder:text-black/45 placeholder:font-normal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sjblue;
+  }
+
+  .message-input::placeholder {
+    @apply font-sans text-sj-body text-black/45 font-normal;
+  }
+
+  .error,
+  .submit-error {
+    @apply m-0 font-sans text-sj-body text-sjred text-center leading-snug;
+  }
+
+  /** Chat-style progress boxes. */
+  .sj-chat-row {
+    @apply flex w-full min-w-0;
+  }
+  .sj-chat-row--user {
+    @apply justify-end;
+  }
+
+  .sj-chat-box {
+    @apply pointer-events-none inline-flex max-w-full min-w-0 flex-col items-start gap-1.5 rounded-xl px-4 py-3.5 font-sans;
+  }
+
+  .sj-chat-box--user {
+    @apply bg-white text-left text-black;
+  }
+
+  .sj-chat-box--status,
+  .sj-chat-box--agent,
+  .sj-chat-box--db {
+    @apply bg-sjblue text-left text-white;
+  }
+
+  .sj-chat-box--error {
+    @apply bg-sjred text-white;
+  }
+
+  .sj-chat-title {
+    @apply font-sans text-sj-body font-semibold tracking-wide text-white/95;
+  }
+
+  .sj-chat-box--user .sj-chat-title {
+    @apply text-sjblue;
+  }
+
+  .sj-chat-body {
+    @apply whitespace-pre-wrap break-words font-sans text-sj-body font-normal leading-relaxed;
+  }
+
+  .sj-chat-box--user .sj-chat-body {
+    @apply text-black;
+  }
+
+  .sj-chat-body--mono {
+    @apply font-sans text-sj-body leading-snug tracking-normal tabular-nums text-white/95;
+  }
+
+  .sj-chat-box--user .sj-chat-body--mono {
+    @apply text-black/85;
+  }
+
+  /* —— Stay In only: Gantt page layout + chart SVG —— */
   /**
    * Gantt route: stacked sections; page scrolls vertically (see App route outlet).
    * flex-none: do not use global main flex-1 — height follows content so the outlet scrolls.
    */
   main.gantt-page {
-    @apply flex w-full min-w-0 flex-none flex-col gap-3 overflow-x-hidden p-3 sm:gap-4 sm:p-4;
+    @apply flex w-full min-w-0 flex-none flex-col gap-8 overflow-x-hidden bg-sj-surface p-4;
   }
 
-  /** Vertical stack: independent blocks; page scroll connects them. */
+  /** Independent blocks; page scroll connects them. */
   .gantt-split {
-    @apply flex w-full min-w-0 flex-col gap-3;
+    @apply flex w-full min-w-0 flex-col gap-8;
   }
 
   .gantt-unscheduled-panel {
-    @apply flex w-full flex-col gap-2 border border-black/10 bg-white p-3 sm:p-4;
+    @apply flex w-full flex-col gap-2 bg-sj-surface p-4;
   }
 
   /** n > 15: capped height; rows scroll inside (shorter than full viewport). */
@@ -48,7 +199,7 @@
    * Explicit height so inner flex (gantt-scroll-frame flex-1) gets real space.
    */
   .gantt-chart-panel {
-    @apply flex w-full min-w-0 shrink-0 flex-col overflow-hidden border border-black/10 bg-white p-3 sm:p-4;
+    @apply flex w-full min-w-0 shrink-0 flex-col overflow-hidden bg-sj-surface px-2 py-3 sm:px-3 sm:py-4;
     height: calc(100dvh - var(--sj-app-nav-height));
     min-height: calc(100dvh - var(--sj-app-nav-height));
   }
@@ -58,108 +209,6 @@
     @apply flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden;
     flex-basis: 0;
     min-height: 0;
-  }
-
-  .compose-block {
-    @apply flex shrink-0 flex-col gap-3 min-w-0;
-  }
-
-  /** Holds scrollable drafts + sticky approve/reject bar. */
-  .drafts-block {
-    @apply flex min-h-0 min-w-0 flex-1 flex-col gap-3;
-  }
-
-  .drafts-container {
-    @apply flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden;
-  }
-
-  /** No border/shadow so actions read as one surface with the page; buttons unchanged. */
-  .approve-actions {
-    @apply sticky bottom-0 z-30 flex shrink-0 flex-wrap justify-end gap-3 bg-white pt-2 pb-0 outline-none;
-  }
-
-  .message-input {
-    @apply w-full min-h-25 border-2 border-sjblue bg-white p-4 text-black shadow-none outline-none resize-none rounded-none box-border focus:border-sjred text-sj-body;
-  }
-
-  .message-input::placeholder {
-    @apply text-black/50 text-sj-control font-normal;
-  }
-
-  .no-drafts {
-    @apply text-black/80 text-sj-control font-medium leading-snug;
-  }
-
-  .error,
-  .submit-error {
-    @apply m-0 text-sjred font-mono text-sj-body;
-  }
-
-  .confidence-badge {
-    @apply inline-flex items-center whitespace-nowrap rounded-full px-5 py-0.5 font-sans font-semibold text-sj-body;
-  }
-
-
-  .sj-action-pill {
-    @apply inline-flex w-60 shrink-0 items-center justify-center gap-1 rounded-full border-0 no-underline text-sj-control font-semibold;
-    @apply bg-sjblue! text-white!;
-    @apply hover:bg-white! hover:text-sjred! hover:outline-2 hover:outline-offset-2 hover:outline-sjred;
-    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-sjblue;
-    @apply disabled:pointer-events-none disabled:opacity-[0.55] disabled:cursor-not-allowed;
-  }
-
-  .sj-action-pill--reject {
-    @apply inline-flex w-60 shrink-0 items-center justify-center gap-1 rounded-full border-0 no-underline text-sj-control font-semibold;
-    @apply bg-sjred! text-white!;
-    @apply hover:bg-white! hover:text-black! hover:outline-2 hover:outline-offset-2 hover:outline-black!;
-    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-black;
-    @apply disabled:pointer-events-none disabled:opacity-[0.55] disabled:cursor-not-allowed;
-  }
-
-  /** Chat-style progress boxes. */
-  .sj-chat-row {
-    @apply flex w-full min-w-0;
-  }
-  .sj-chat-row--user {
-    @apply justify-end;
-  }
-
-  .sj-chat-box {
-    @apply inline-flex max-w-full min-w-0 flex-col items-start gap-1 border-2 border-sjblue p-4 text-white shadow-none rounded-lg;
-    @apply pointer-events-none;
-  }
-
-  .sj-chat-box--user {
-    @apply bg-white text-black text-right;
-  }
-
-  .sj-chat-box--status, .sj-chat-box--agent, .sj-chat-box--db {
-    @apply bg-sjblue text-white text-left;
-  }
-
-  .sj-chat-box--error {
-    @apply bg-sjred text-white border-sjred;
-  }
-
-  .sj-chat-title {
-    @apply font-semibold tracking-wide opacity-90 text-sj-body;
-  }
-
-  .sj-chat-body {
-    @apply font-normal whitespace-pre-wrap break-words text-sj-body;
-  }
-  /**/
-
-  .confidence-high {
-    @apply bg-black/20 text-white;
-  }
-
-  .confidence-medium {
-    @apply bg-sjblue/80 text-white;
-  }
-
-  .confidence-low {
-    @apply bg-sjred/90 text-white;
   }
 
   /** Gantt dependency connectors (orthogonal path in SVG; painted under bars). */
@@ -197,7 +246,8 @@
   }
 
   .gantt-header-line1,
-  .gantt-header-line2 {
-    @apply fill-black font-sans font-semibold text-[9px];
+  .gantt-header-line2,
+  .gantt-header-line3 {
+    @apply fill-black font-sans font-semibold text-[11px];
   }
 }

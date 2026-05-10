@@ -1,7 +1,7 @@
 import os
 import uuid
 from contextvars import ContextVar
-from agent_framework import Agent, AgentResponseUpdate, WorkflowBuilder
+from agent_framework import Agent, AgentResponse, AgentResponseUpdate, WorkflowBuilder
 from agent_framework.foundry import FoundryChatClient
 from azure.identity import DefaultAzureCredential
 
@@ -123,33 +123,69 @@ async def workflow_execution(prior_iteration_notes: str = "") -> str:
     last_worker: str | None = None
     segment_text: str = ""
     events = workflow.run(workflow_text, stream=True)
-    responses = []
-    async for event in events:
-        if event.type == "output" and isinstance(event.data, AgentResponseUpdate):
-            update = event.data
-            author = update.author_name
-            chunk = update.text or ""
-            if author != last_worker:
-                if last_worker is not None and segment_text:
-                    try_emit_progress(
-                        {
-                            "kind": "agent",
-                            "author": last_worker,
-                            "text": segment_text,
-                        }
-                    )
-                if last_worker is not None:
-                    print()  # Newline between different workers
-                print(f"\n{author}: {chunk}", end="", flush=True)
-                responses.append(f"{author}: {chunk}")
-                last_worker = author
-                segment_text = chunk
-            else:
-                print(chunk, end="", flush=True)
-                responses[-1] += chunk
-                segment_text += chunk
+    responses: list[str] = []
 
-    if last_worker is not None and segment_text:
+    def flush_segment() -> None:
+        nonlocal last_worker, segment_text
+        if last_worker is not None and segment_text.strip():
+            try_emit_progress(
+                {"kind": "agent", "author": last_worker, "text": segment_text}
+            )
+        last_worker = None
+        segment_text = ""
+
+    def resolve_author(update: AgentResponseUpdate, executor_id: str) -> str:
+        name = (update.author_name or "").strip()
+        if name:
+            return name
+        ex = (executor_id or "").strip()
+        return ex if ex else "Agent"
+
+    async for event in events:
+        ex_id = getattr(event, "executor_id", None) or ""
+        if event.type not in ("output", "data"):
+            continue
+        data = event.data
+
+        if isinstance(data, AgentResponse):
+            flush_segment()
+            for msg in data.messages:
+                author = (msg.author_name or "").strip() or ex_id or "Agent"
+                chunk = msg.text or ""
+                if not chunk.strip():
+                    continue
+                print(f"\n{author}: {chunk}", end="", flush=True)
+                try_emit_progress(
+                    {"kind": "agent", "author": author, "text": chunk})
+                responses.append(f"{author}: {chunk}")
+            continue
+
+        if not isinstance(data, AgentResponseUpdate):
+            continue
+
+        author = resolve_author(data, ex_id)
+        chunk = data.text or ""
+        if last_worker is None:
+            print(f"\n{author}: {chunk}", end="", flush=True)
+            responses.append(f"{author}: {chunk}")
+            last_worker = author
+            segment_text = chunk
+        elif author == last_worker:
+            print(chunk, end="", flush=True)
+            if responses:
+                responses[-1] += chunk
+            segment_text += chunk
+        else:
+            if last_worker is not None and segment_text.strip():
+                try_emit_progress(
+                    {"kind": "agent", "author": last_worker, "text": segment_text}
+                )
+            print(f"\n{author}: {chunk}", end="", flush=True)
+            responses.append(f"{author}: {chunk}")
+            last_worker = author
+            segment_text = chunk
+
+    if last_worker is not None and segment_text.strip():
         try_emit_progress(
             {"kind": "agent", "author": last_worker, "text": segment_text}
         )

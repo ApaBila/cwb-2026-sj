@@ -13,7 +13,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { Checkbox } from 'flowbite-react';
-import { ownerInitials } from './utils/initials';
+import { ownerFilterHaystack, ownerInitials } from './utils/initials';
 
 function includesTextFilter(row, columnId, filterValue) {
   if (filterValue == null || filterValue === '') return true;
@@ -114,8 +114,7 @@ const UNSCHEDULED_COLUMNS = [
   },
   {
     id: 'owner_name',
-    accessorFn: (row) =>
-      [row.owner_name, row.owner_id].filter(Boolean).join(' ') || '',
+    accessorFn: (row) => ownerFilterHaystack(row.owner_name, row.owner_id),
     header: 'Owner',
     cell: (info) => {
       const r = info.row.original;
@@ -145,9 +144,12 @@ const FULL_COLUMNS = [
   },
   {
     id: 'owner_name',
-    accessorKey: 'owner_name',
+    accessorFn: (row) => ownerFilterHaystack(row.owner_name, row.owner_id),
     header: 'Owner',
-    cell: (info) => info.getValue() || '—',
+    cell: (info) => {
+      const r = info.row.original;
+      return r.owner_name || r.owner_id || '—';
+    },
     filterFn: includesTextFilter,
     sortingFn: 'alphanumeric',
   },
@@ -319,7 +321,16 @@ export default function DraftsDataTable({
 
   const hasFilters = table.getState().columnFilters.length > 0;
 
-  const headerGroup = table.getHeaderGroups()[0];
+  /** One filter control per visible leaf column (matches tbody); avoids using row 0 headers when multiple header groups exist. */
+  const visibleLeafColumns = table.getVisibleLeafColumns();
+  const filteredRowIds = table
+    .getFilteredRowModel()
+    .rows.map((r) => r.original.task_id)
+    .filter(Boolean);
+  const allFilteredRowsSelected =
+    filteredRowIds.length > 0 &&
+    filteredRowIds.every((id) => selectedIds.has(id));
+
   const minWidth =
     variant === 'unscheduled' ? UNSCHEDULED_TABLE_MIN_WIDTH_PX : DRAFTS_TABLE_MIN_WIDTH_PX;
   const colgroup = variant === 'unscheduled' ? UNSCHEDULED_COLGROUP : DRAFTS_COLGROUP;
@@ -418,47 +429,33 @@ export default function DraftsDataTable({
               </tr>
             ))}
             <tr>
-              {headerGroup?.headers.map((header) => {
-                const ctxTable = header.getContext().table;
-                const meta = ctxTable.options.meta ?? {};
-                const { selectedIds = new Set(), onToggleAllFiltered } = meta;
-                const filtered = ctxTable.getFilteredRowModel().rows;
-                const ids = filtered
-                  .map((r) => r.original.task_id)
-                  .filter(Boolean);
-                const allSelected =
-                  ids.length > 0 && ids.every((id) => selectedIds.has(id));
-
-                return (
-                  <th
-                    key={`f-${header.id}`}
-                    className={`px-2 pb-2 pt-1 ${header.column.id === '_select' ? 'align-middle text-center' : 'align-top text-left'}`}
-                  >
-                    {header.column.id === '_select' ? (
-                      <div className="flex items-center justify-center py-0.5">
-                        <Checkbox
-                          aria-label="Select all visible rows"
-                          checked={allSelected}
-                          onChange={() => onToggleAllFiltered?.(ids)}
-                        />
-                      </div>
-                    ) : header.column.getCanFilter() ? (
-                      <input
-                        type="search"
-                        aria-label={`Filter ${header.column.id}`}
-                        placeholder="Filter..."
-                        value={header.column.getFilterValue() ?? ''}
-                        onChange={(e) =>
-                          header.column.setFilterValue(
-                            e.target.value || undefined,
-                          )
-                        }
-                        className="box-border w-full min-w-[5.5rem] max-w-full rounded-xl bg-sj-surface px-1.5 py-0.5 font-sans text-sj-body font-semibold text-black placeholder:text-black/35 placeholder:font-normal focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sjblue/50"
+              {visibleLeafColumns.map((column) => (
+                <th
+                  key={`f-${column.id}`}
+                  className={`px-2 pb-2 pt-1 ${column.id === '_select' ? 'align-middle text-center' : 'align-top text-left'}`}
+                >
+                  {column.id === '_select' ? (
+                    <div className="flex items-center justify-center py-0.5">
+                      <Checkbox
+                        aria-label="Select all visible rows"
+                        checked={allFilteredRowsSelected}
+                        onChange={() => onToggleAllFiltered?.(filteredRowIds)}
                       />
-                    ) : null}
-                  </th>
-                );
-              })}
+                    </div>
+                  ) : column.getCanFilter() ? (
+                    <input
+                      type="search"
+                      aria-label={`Filter ${column.id}`}
+                      placeholder="Filter..."
+                      value={column.getFilterValue() ?? ''}
+                      onChange={(e) =>
+                        column.setFilterValue(e.target.value || undefined)
+                      }
+                      className="box-border w-full min-w-[5.5rem] max-w-full rounded-xl bg-sj-surface px-1.5 py-0.5 font-sans text-sj-body font-semibold text-black placeholder:text-black/35 placeholder:font-normal focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sjblue/50"
+                    />
+                  ) : null}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="font-sans text-sj-body text-black">

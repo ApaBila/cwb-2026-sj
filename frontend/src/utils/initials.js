@@ -15,3 +15,16 @@ export function ownerInitials(ownerName, ownerId) {
   }
   return raw.slice(0, 2).toUpperCase();
 }
+
+/**
+ * Substring-search text for owner filters: display name, id, and {@link ownerInitials} (when shown).
+ * @param {string | null | undefined} ownerName
+ * @param {string | null | undefined} ownerId
+ * @returns {string}
+ */
+export function ownerFilterHaystack(ownerName, ownerId) {
+  const base = [ownerName, ownerId].filter(Boolean).join(' ').trim();
+  const ini = ownerInitials(ownerName, ownerId);
+  const initialsPart = ini === '—' ? '' : ini;
+  return [base, initialsPart].filter(Boolean).join(' ').trim();
+}

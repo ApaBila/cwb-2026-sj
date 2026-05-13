@@ -15,7 +15,7 @@ import {
   GANTT_CHART_BODY_BOTTOM_PAD,
   formatTasksAsEditPrefill,
 } from './utils/gantt_config';
-import { ownerInitials } from './utils/initials';
+import { ownerFilterHaystack, ownerInitials } from './utils/initials';
 import { sortTasksForGanttLayout } from './utils/gantt_task_order';
 import { ganttDependencyPathD } from './utils/gantt_dependency_path';
 import DraftsDataTable from './DraftsDataTable';
@@ -183,8 +183,8 @@ function Gantt() {
     return tasks.filter((t) => {
       if (!cellIncludesFilter(t.project_id, columnFilters.project_id)) return false;
       if (!cellIncludesFilter(t.task_title, columnFilters.task_title)) return false;
-      const ownerLabel = t.owner_name ?? t.owner_id ?? '';
-      if (!cellIncludesFilter(ownerLabel, columnFilters.owner_name)) return false;
+      if (!cellIncludesFilter(ownerFilterHaystack(t.owner_name, t.owner_id), columnFilters.owner_name))
+        return false;
       return true;
     });
   }, [tasks, columnFilters]);
